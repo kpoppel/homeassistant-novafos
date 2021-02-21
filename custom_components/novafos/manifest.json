@@ -1,0 +1,16 @@
+{
+  "domain": "novafos",
+  "name": "Novafos",
+  "config_flow": true,
+  "documentation": "https://www.home-assistant.io/integrations/novafos",
+  "requirements": [
+    "requests==2.22.0"
+  ],
+  "ssdp": [],
+  "zeroconf": [],
+  "homekit": {},
+  "dependencies": [],
+  "codeowners": [
+    "@kpoppel"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "data": {
+                    "username": "Brugernavn",
+                    "password": "Kodeord",
+                    "supplierid": "Leverandør ID"
+                },
+                "title": "Angiv brugernavn, kodeord og leverandør ID"
+            }
+        },
+        "title": "Novafos"
+    }
+}

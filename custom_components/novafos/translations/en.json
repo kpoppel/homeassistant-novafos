@@ -1,0 +1,15 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "data": {
+                    "username": "User name",
+                    "password": "Password",
+                    "supplierid": "Supplier ID"
+                },
+                "title": "Enter username, password and supplier id"
+            }
+        },
+        "title": "Novafos"
+    }
+}
