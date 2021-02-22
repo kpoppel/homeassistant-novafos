@@ -30,8 +30,8 @@ class TimeSeries:
         self._status = status
         self._data_date = data_date
         self._metering_data = metering_data
-        self._detailed_status = detailed_status
         self._total_metering_data = total_metering_data
+        self._detailed_status = detailed_status
 
     @property
     def status(self):
