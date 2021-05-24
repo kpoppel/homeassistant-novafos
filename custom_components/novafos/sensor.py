@@ -80,5 +80,5 @@ class NovafosWater(Entity):
             self._state = self._data.get_year_to_date()
         else:
             self._state = self._data.get_usage_hour(self._hour)
-        _LOGGER.debug(f"Setting status for {self._name} = {self._state} {self._unit}")
+        _LOGGER.debug(f"Setting status for {self._name} = {self._state} {VOLUME_CUBIC_METERS}")
 
