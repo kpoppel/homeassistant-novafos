@@ -21,15 +21,15 @@ def main():
     result = Novafos(args.refresh_token).get_latest(args.metering_point)
     if result.status == 200:
         total = 0
-        print(f"Date: {result.data_date}")
+        _LOGGER.debug(f"Date: {result.data_date}")
         for hour in range(24):
             data = result.get_metering_data(hour)
             total += data
-            print(f"Hour {hour}-{hour+1}: {data}kWh")
+            _LOGGER.debug(f"Hour {hour}-{hour+1}: {data} m3")
 
-        print(f"Total: {total}kWh")
+        _LOGGER.debug(f"Total: {total} m3")
     else:
-        print(f"Error getting data. Status: {result.status}. Error: {result.detailed_status}")
+        _LOGGER.debug(f"Error getting data. Status: {result.status}. Error: {result.detailed_status}")
 
 def _configureLogging(args):
     if args.log:

@@ -221,7 +221,12 @@ class Novafos:
                         _LOGGER.debug(f"{fr}-{to} : {val} : {valid}")
                         total_metering_data = val
 
-                date = valid_end
+                # TODO:
+                # 'valid_end' will be 1 day before the day data was fetched. 'end' is the day data was fetched.
+                # HA gets confused if the timeseries day is in the past I think.  But do try both.
+                date = end
+                #date = valid_end
+
                 time_series = TimeSeries(200, date, metering_data, total_metering_data)
                 parsed_result[date] = time_series
         else:

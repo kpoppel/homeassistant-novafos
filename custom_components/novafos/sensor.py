@@ -78,8 +78,7 @@ class NovafosWater(Entity):
 
         if self._sensor_type == 'total':
             self._state = self._data.get_year_to_date()
-            _LOGGER.debug(f"Setting status {self._name} = {self._state}")
         else:
             self._state = self._data.get_usage_hour(self._hour)
-            _LOGGER.debug(f"Setting status {self._name} = {self._state}")
+        _LOGGER.debug(f"Setting status for {self._name} = {self._state} {self._unit}")
 
