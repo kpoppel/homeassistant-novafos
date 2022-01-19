@@ -1,121 +1,93 @@
-"""The Novafos integration."""
-import asyncio
-import logging
-import sys
-
-import voluptuous as vol
-from homeassistant.util import Throttle
-from datetime import timedelta
+"""The novafos integration."""
+from __future__ import annotations
+from datetime import datetime, timedelta
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
+from .const import DOMAIN, MIN_TIME_BETWEEN_UPDATES
+
+# The Novafos integration - not on PyPi, just bundled here.
+# Contrary to:
+# https://developers.home-assistant.io/docs/creating_component_code_review#4-communication-with-devicesservices
 from custom_components.novafos.pynovafos.novafos import Novafos
 
-from .const import DOMAIN
-
-import requests
-
+# Development help
+import logging
+import sys
 _LOGGER = logging.getLogger(__name__)
 
+PLATFORMS: list[Platform] = [Platform.SENSOR]
 
-CONFIG_SCHEMA = vol.Schema({DOMAIN: vol.Schema({})}, extra=vol.ALLOW_EXTRA)
+#async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+#    """Set up the Novafos component if we want to do more before the async_setup_entry()"""
+#      hass.data[DOMAIN] = {}
+#    or
+#      hass.data.setdefault(DOMAIN, {})
+#    return True
 
-PLATFORMS = ["sensor"]
-
-# Every 6 hours seems appropriate to get an update ready in the morning
-MIN_TIME_BETWEEN_UPDATES = timedelta(hours=6)
-# Sure, let's bash the API service.. But useful when trying to get results fast.
-#MIN_TIME_BETWEEN_UPDATES = timedelta(minutes=1)
-
-
-async def async_setup(hass: HomeAssistant, config: dict):
-    """Set up the Novafos component."""
-    hass.data[DOMAIN] = {}
-    return True
-
-
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
-    """Set up Eforsyning from a config entry."""
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up novafos from a config entry."""
     username = entry.data['username']
     password = entry.data['password']
     supplierid = entry.data['supplierid']
     
+    _LOGGER.debug("Novafos ConfigData: {entry.data}")
+
+    # Add the HomeAssistant specific API to the Novafos integration.
+    # The Sensor entity in the integration will call function here to do its thing.
+    hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = HassNovafos(username, password, supplierid)
 
-    for component in PLATFORMS:
-        hass.async_create_task(
-            hass.config_entries.async_forward_entry_setup(entry, component)
-        )
+    hass.config_entries.async_setup_platforms(entry, PLATFORMS)
 
     return True
 
-
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    unload_ok = all(
-        await asyncio.gather(
-            *[
-                hass.config_entries.async_forward_entry_unload(entry, component)
-                for component in PLATFORMS
-            ]
-        )
-    )
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok
 
+from homeassistant.util import Throttle
+import requests
+
 class HassNovafos:
+    """Home-Assistant specific API for Novafos."""
     def __init__(self, username, password, supplierid):
+        self.supplierid = supplierid
+        self.data = {}
         self._client = Novafos(username, password, supplierid)
+        self._last_session = None
+        _LOGGER.debug("A HassNovafos class was created")
 
-        self._supplierid = supplierid
-        self._data = None
-
-    def get_year_to_date(self):
-        if self._data != None:
-            return self._data.get_total_metering_data()
-            #return round(self._data.get_total_metering_data(), 3)
-        else:
-            return None
-
-    def get_usage_hour(self, hour):
-        if self._data != None:
-            return self._data.get_metering_data(hour)
-            #return round(self._data.get_metering_data(hour), 3)
-        else:
-            return None
-
-    def get_data_date(self):
-        if self._data != None:
-            return self._data.data_date.date().strftime('%Y-%m-%d')
-        else:
-            return None
-
-    def get_metering_point(self):
-        return self._supplierid
-
+    # The Throttle annotation sets a limit to how often we update data. See const.py
     @Throttle(MIN_TIME_BETWEEN_UPDATES)
     def update(self):
         _LOGGER.debug("Fetching data from Novafos")
         # If debugging, the try/catch can be annoying. Use this line and comment away the rest.
-        #self._data = self._client.get_latest()
-        try: 
-            data = self._client.get_latest()
-            if data.status == 200:
-                self._data = data
-            else:
-                _LOGGER.warn(f"Error from novafos: {data.status} - {data.detailed_status}")
-        except requests.exceptions.HTTPError as he:
-            message = None
-            if he.response.status_code == 401:
-                message = f"Unauthorized error while accessing novafos. Wrong or expired credentials or supplier ID?"
-            else:
-                message = f"Exception: {e}"
+        if self._last_session == None or (datetime.now()-self._last_session) >= timedelta(minutes=60):
+            self.data = self._client.get_latest()
+            self._last_session = datetime.now()
 
-            _LOGGER.warn(message)
-        except: 
-            e = sys.exc_info()[0]
-            _LOGGER.warn(f"Exception: {e}")
+#        try: 
+#            data = self._client.get_latest()
+#            if data.status == 200:
+#                self.data = data
+#            else:
+#                _LOGGER.warn(f"Error from novafos: {data.status} - {data.detailed_status}")
+#        except requests.exceptions.HTTPError as he:
+#            message = None
+#            if he.response.status_code == 401:
+#                message = f"Unauthorized error while accessing novafos. Wrong or expired credentials or supplier ID?"
+#            else:
+#                message = f"Exception: {e}"
+#
+#            _LOGGER.warn(message)
+#        except: 
+#            e = sys.exc_info()[0]
+#            _LOGGER.warn(f"Exception: {e}")
         _LOGGER.debug("Done fetching data from Novafos")

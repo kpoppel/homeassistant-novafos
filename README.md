@@ -4,7 +4,10 @@
 
 The `novafos`component is a Home Assistant custom component for monitoring your water metering data from Novafos (via KMD)
 
-*The custom component is in its very early stage for showing data from Novafos.*
+*This version 1.x is not backwards compatible with the 0.x versions.  If you use 0.x versions and is happy with this do not update before reading this README.  Please remove the integration and add it again after updating.*
+
+*If something stops working, downgrade and file a bug.*
+
 
 ## Installation
 ---
@@ -25,7 +28,7 @@ Fully configurable through config flow.
   1. Head to configuration --> integration
   2. Add new and search for novafos
   3. Enter email address and pasword as registered with Novafos.
-     If you haven't done this before you need to login using NemId and
+     If you haven't done this before you need to login using NemId/MitId and
      setup email and password first.
   4. Enter the supplier ID as well.  Until a better way to get this automatically is identified, you can get the value from inspecting the browser network traffic. See the next section.<br>
   
@@ -36,17 +39,23 @@ Fully configurable through config flow.
 
 ## State and attributes
 ---
-!Note! Data is delayed in the data warehouse.  the most recent data was found to be most reliable from 48-24 hours ago from today's midnight.  I.e. the data retrieved is from the day before yesterday.
+!Note! Data is delayed in the data warehouse.  Data validity will range from 24h to 5 days ago from today's midnight.  This means the sensor data represents historical data.
 
-A sensor for each hour in the last valid 24 hours is created with the syntax:
- * sensor.novafos_water_0_1
- * sensor.novafos_water_1_2
- * etc.
+The integration creates the following sensors:
+* sensor.novafos_year_total
+  * The total consumption until the last valid date
+* sensor.novafos_month_total
+  * The total consumption current until the last valid date
+* sensor.novafos_day_total
+  * The total consumtion on the last valid date
+  * Attributes contain day data since the first day of the month at the correct dates
+* sensor.novafos_hour_total
+  * The hourly consumption on the last valid date
+  * Attributes contain data from the last 24 hours on the correct date
+* sensor.novafos_valid_date
+  * Just the date of the last valid data
 
-A sensor which sum up the total water used to date (again with delay) is added as well:
- * sensor.novafos_water_total
-
-All sensors show their value in cubuc meters (m3).
+All water sensors show their value in cubuc meters (m3).  The sensors also have extended attributes as outlined above, which can be used by ex. apexchart-card to chart data at the correct date.  You can also create new sensors from these attributes to save them in the history database.  Attributes are not saved in the history.
 
 ## Debugging
 It is possible to debug log the raw response from KMD API. This is done by setting up logging like below in configuration.yaml in Home Assistant. It is also possible to set the log level through a service call in UI.  
@@ -54,159 +63,91 @@ It is possible to debug log the raw response from KMD API. This is done by setti
 logger: 
   default: info
   logs: 
-    pynovafos.novafos: debug
+    custom_components.novafos: debug
 ```
 
 ## Examples
 
-### Daily average and gauge bar indicating high usage
-Below example is an example how to display daily average and a guage indicating high usage. 
+### Entity card with latest sensor data
+This example is just an entity card with the latest data of all sensors.  It shows when the latest data was valid as a reference.
 
-![alt text](images/example1.png "Bar graph Example")
+![alt text](images/example_1.png "Bar graph Example")
 
+## Apexchart card with data placed at the correct date
+This is a configuratio for the apexchart card.  Because data retrieved today may be at least 24 hours old, graphing the sensor state will put values on the wrong date.
+If this is not wanted, the sensors also provide attributes with the data and the correct dates.  Apexchart can graph this.
 
-**Requirements**
+TBD:
+One caveat though is that attributes are not saved in the sensor history.  So what the module does is to fetch daily use from the start of the month, and hourly data 7 days back or so.  Then from the attributes it is at least possible to put daily and hourly use at the correct date.
 
-* Recorder component holding minimum the number of days the average display should cover.
-* Lovelace Config Template Card (https://github.com/iantrich/config-template-card)
-
-**Average sensor**
-
-Below statistics sensor shows the daily average calculated over the last 30 days. 
-```
-sensor:
-  - platform: statistics
-    entity_id: sensor.novafos_water_total
-    name: Water Monthly Statistics
-    sampling_size: 50
-    max_age:
-        days: 30
+The sensors still save daily and hourly values but remember these values are only as valid as the latest data available from the API.
 
 ```
-
-**Lovelace**
-
-```
-type: vertical-stack
-cards:
-  - card:
-      entity: sensor.novafos_water_total
-      max: 20
-      min: 0
-      name: >-
-        ${'Vandforbrug d. ' +
-        states['sensor.novafos_water_total'].attributes.metering_date }
-      severity:
-        green: 0
-        red: '${states[''sensor.novafos_water_monthly_statistics''].state * 1.25}'
-        yellow: '${states[''novafos_water_monthly_statistics''].state * 1.10}'
-      type: gauge
-    entities:
-      - sensor.novafos_water_total
-      - sensor.novafos_water_statistics
-    type: 'custom:config-template-card'
-  - type: entity
-    entity: sensor.novafos_water_statistics
-    name: Daglig gennemsnit
-
-```
-
-**Year to date graph**
-```
-type: 'custom:mini-graph-card'
-hours_to_show: 72
-aggregate_func: max
-color_thresholds:
-  - color: '#17DD1B'
-    value: 50
-  - color: '#f39c12'
-    value: 100
-  - color: '#FF5600'
-    value: 150
-  - color: '#c0392b'
-    value: 170
-entities:
-  - entity: sensor.novafos_water_total
-    name: total
-group_by: date
-hour24: true
-name: 'Vandforbrug i år, 48 timer forsinket'
-show:
-  fill: true
-  graph: bar
-  labels: false
-  legend: false
+type: custom:apexcharts-card
+graph_span: 7d
+span:
+  end: day
+  offset: '-1d'
+header:
+  show: true
+  title: Water year to date
+  show_states: true
+  colorize_states: true
+yaxis:
+  - id: left
+    decimals: 3
+  - id: right
+    opposite: true
+    decimals: 2
+series:
+  - entity: sensor.novafos_day_total
+    extend_to_end: false
+    type: column
+    yaxis_id: left
+    data_generator: |
+      return entity.attributes.data.map((start, index) => {
+        return [new Date(start["DateTo"]).getTime(), entity.attributes.data[index]["Value"]];
+      });
+  - entity: sensor.novafos_hour
+    extend_to_end: false
+    yaxis_id: left
+    type: column
+    data_generator: |
+      return entity.attributes.data.map((start, index) => {
+        return [new Date(start["DateTo"]).getTime(), entity.attributes.data[index]["Value"]];
+      });
+  - entity: sensor.novafos_year_total
+    type: column
+    yaxis_id: right
+    data_generator: >
+      return [[new Date(entity.attributes.last_valid_date).getTime(),
+      entity.state]]
+  - entity: sensor.novafos_month_total
+    type: column
+    yaxis_id: right
+    data_generator: >
+      return [[new Date(entity.attributes.last_valid_date).getTime(),
+      entity.attributes.data[0]["Value"]]]
 ```
 
-**Hourly graph with lastest data**
-```
-type: 'custom:mini-graph-card'
-hours_to_show: 48
-aggregate_func: max
-color_thresholds:
-  - color: '#17DD1B'
-    value: 0.65
-  - color: '#f39c12'
-    value: 0.8
-  - color: '#FF5600'
-    value: 1
-  - color: '#c0392b'
-    value: 1.2
-entities:
-  - entity: sensor.novafos_water_0_1
-    name: 00-01
-  - entity: sensor.novafos_water_1_2
-    name: 01-02
-  - entity: sensor.novafos_water_2_3
-    name: 02-03
-  - entity: sensor.novafos_water_3_4
-    name: 03-04
-  - entity: sensor.novafos_water_4_5
-    name: 04-05
-  - entity: sensor.novafos_water_5_6
-    name: 05-06
-  - entity: sensor.novafos_water_6_7
-    name: 06-07
-  - entity: sensor.novafos_water_7_8
-    name: 07-08
-  - entity: sensor.novafos_water_8_9
-    name: 08-09
-  - entity: sensor.novafos_water_9_10
-    name: 09-10
-  - entity: sensor.novafos_water_10_11
-    name: 10-11
-  - entity: sensor.novafos_water_11_12
-    name: 11-12
-  - entity: sensor.novafos_water_12_13
-    name: 12-13
-  - entity: sensor.novafos_water_13_14
-    name: 13-14
-  - entity: sensor.novafos_water_14_15
-    name: 14-15
-  - entity: sensor.novafos_water_15_16
-    name: 15-16
-  - entity: sensor.novafos_water_16_17
-    name: 16-17
-  - entity: sensor.novafos_water_17_18
-    name: 17-18
-  - entity: sensor.novafos_water_18_19
-    name: 18-19
-  - entity: sensor.novafos_water_19_20
-    name: 19-20
-  - entity: sensor.novafos_water_20_21
-    name: 20-21
-  - entity: sensor.novafos_water_21_22
-    name: 21-22
-  - entity: sensor.novafos_water_22_23
-    name: 22-23
-  - entity: sensor.novafos_water_23_24
-    name: 23-24
-group_by: date
-hour24: true
-name: Vandforbrug 48 timer forsinket.
-show:
-  fill: true
-  graph: bar
-  labels: false
-  legend: false
-```
+
+
+---
+## What is new in v1.x
+
+The v1.x version changes the API endpoint used and the authentication method.  The API used is vastly simplified which makes it much easier to retrieve the data.
+The update was triggered mainly because my data fetched from Novafos stopped in early 2022.  Looking at the website and the data I discovered two things: The last valid data had holes in them and were even 5 days old.  The 0.x version of this module assumes laways that the last valid data is 24 hours delayed.  Secondly I saw that the endpoint for fetching data had changed and that the data looked a lot more intuitive.
+
+One thing I wanted to change as well was to put the data at the right date.  Home assistant sensors do not allow setting historical data at the correct point in time. Looking at sensor attributes and apexchart-card, I saw an opportunity to use attributes to put data at the correct date.
+
+Another thing was the many sensors for 1 hour data.  I do not find a use for saving a sensor which will show me how much water was used at 02:00 over time.  I would however like a single sensor showing me the water used hour by hour.
+
+There is a price to this still because while the sensor will 'reveal' data hour by hour, the data will be revealed at the wrong time due to how sensors work in Home Assistant.
+
+Charting the last valid day at the right date using attributes is now possible.
+
+Charting the water use day-by-day using attributes (for the correct date) or the sensor value is possible.
+
+Charting the water use current month and year total is also possible.
+
+Also added a sensor signalling the last valid date for the data.

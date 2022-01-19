@@ -1,15 +1,22 @@
 {
     "config": {
+        "abort": {
+            "already_configured": "Integrationen er allerede konfigureret"
+        },
+        "error": {
+            "cannot_connect": "Kunne ikke få forbindelse",
+            "invalid_auth": "Kunne ikke logge ind",
+            "unknown": "Uventet fejl"
+        },
         "step": {
             "user": {
                 "data": {
-                    "username": "Brugernavn",
+                    "supplierid": "Leverandør ID",
                     "password": "Kodeord",
-                    "supplierid": "Leverandør ID"
-                },
-                "title": "Angiv brugernavn, kodeord og leverandør ID"
+                    "username": "Brugernavn",
+                    "name": "Sensornavn Præfix"
+                }
             }
-        },
-        "title": "Novafos"
+        }
     }
 }

@@ -1,15 +1,22 @@
 {
     "config": {
+        "abort": {
+            "already_configured": "Integration is already configured"
+        },
+        "error": {
+            "cannot_connect": "Failed to connect",
+            "invalid_auth": "Invalid authentication",
+            "unknown": "Unexpected error"
+        },
         "step": {
             "user": {
                 "data": {
-                    "username": "User name",
+                    "supplierid": "Supplier ID",
                     "password": "Password",
-                    "supplierid": "Supplier ID"
-                },
-                "title": "Enter username, password and supplier id"
+                    "username": "Username",
+                    "name": "Sensor Name Prefix"
+                }
             }
-        },
-        "title": "Novafos"
+        }
     }
 }
