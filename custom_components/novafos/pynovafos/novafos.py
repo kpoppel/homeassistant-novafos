@@ -19,7 +19,7 @@ class Novafos:
         self._username = username
         self._password = password
         self._supplierid = supplierid
-        self._auth_url = f'https://{supplierid}.webtools.kmd.dk/'
+        self._auth_url = f'https://webtools.kmd.dk/'
         self._api_url = "https://minforsyningplugin2webapi.kmd.dk/"
 
         self._session_id = ""
@@ -309,14 +309,17 @@ class Novafos:
         """
         if days_back:
             start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-            duration = range(1, days_back+1)
+            #duration = range(1, days_back+1)
+            duration = range(days_back, 0, -1)
         elif from_date:
             start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-            duration = range(1, (start_date - from_date).days+1)
+            #duration = range(1, (start_date - from_date).days+1)
+            duration = range((start_date - from_date).days, 0, -1)
         else:
             start_date = datetime.strptime(self._last_valid_day, '%Y-%m-%dT%H:%M:%S%z').replace(hour=0, minute=0, second=0, microsecond=0)
             duration = range(1)
 
+        first_day = True
         for day in duration:
             now = (start_date - timedelta(days=day)).replace(hour=0, minute=0, second=0, microsecond=0)
             # I would claim this is a bug in the REST service.  Asking for data for an hour also return the hour after. So we ask for data until 22:59 to
@@ -327,11 +330,18 @@ class Novafos:
             _LOGGER.debug(f"Getting Hour data {day} day(s) back in time from {dateFrom} to {dateTo}")
             time_series = self._get_consumption_timeseries(dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level['Hour'])
             _LOGGER.debug(f"timeseries = {time_series}")
-            if day > 1:
-                # Prepend hourly data to the data field.
-                self._meter_data["hour"]["Data"] = time_series[0]["Data"] + self._meter_data["hour"]["Data"]
-            else:
+            if first_day:
                 self._meter_data["hour"] = time_series[0]
+                first_day = False
+            elif time_series[0]["Data"]:
+                # If the dataset returned is not empty, move the valid date and mix/max/avg data forward.
+                # That will ensure the dataset reflects the latest values in case they are >24h old
+                self._meter_data["hour"]["Data"] = self._meter_data["hour"]["Data"] + time_series[0]["Data"]
+                self._meter_data["hour"]["Total"] = time_series[0]["Total"]
+                self._meter_data["hour"]["Average"] = time_series[0]["Average"]
+                self._meter_data["hour"]["Maximum"] = time_series[0]["Maximum"]
+                self._meter_data["hour"]["Minimum"] = time_series[0]["Minimum"]
+                self._meter_data["hour"]["LastValidDate"] = time_series[0]["LastValidDate"]
 
         #_LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
         for hour_data in self._meter_data["hour"]["Data"]:
