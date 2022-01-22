@@ -3,7 +3,6 @@ Primary public module for novafos.dk API wrapper.
 '''
 from datetime import datetime
 from datetime import timedelta
-import json
 import requests
 import logging
 

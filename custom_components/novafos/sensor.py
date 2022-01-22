@@ -16,7 +16,6 @@ import logging
 _LOGGER = logging.getLogger(__name__)
 
 from custom_components.novafos.pynovafos.novafos import Novafos
-from custom_components.novafos.pynovafos.models import TimeSeries
 
 from . import HassNovafos
 from .const import (DOMAIN, SENSOR_TYPES)
