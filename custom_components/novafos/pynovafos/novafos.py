@@ -3,6 +3,7 @@ Primary public module for novafos.dk API wrapper.
 '''
 from datetime import datetime
 from datetime import timedelta
+import json
 import requests
 import logging
 
@@ -209,7 +210,10 @@ class Novafos:
 
             result = requests.post(url, json=data, headers=headers)
             result_json = result.json()
+
+            # Enable this to see all returned data from the API:
             #print(json.dumps(result_json, sort_keys = False, indent = 4))
+
             # Clean data so only valid data is returned and register the valid date
             series_data = []
             last_valid_date = ""
@@ -306,11 +310,9 @@ class Novafos:
         """
         if days_back:
             start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-            #duration = range(1, days_back+1)
             duration = range(days_back, 0, -1)
         elif from_date:
             start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-            #duration = range(1, (start_date - from_date).days+1)
             duration = range((start_date - from_date).days, 0, -1)
         else:
             start_date = datetime.strptime(self._last_valid_day, '%Y-%m-%dT%H:%M:%S%z').replace(hour=0, minute=0, second=0, microsecond=0)
@@ -326,7 +328,8 @@ class Novafos:
             #dateTo = now.replace(hour=23, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S.000Z")
             _LOGGER.debug(f"Getting Hour data {day} day(s) back in time from {dateFrom} to {dateTo}")
             time_series = self._get_consumption_timeseries(dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level['Hour'])
-            _LOGGER.debug(f"timeseries = {time_series}")
+            #_LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
+
             if first_day:
                 self._meter_data["hour"] = time_series[0]
                 first_day = False
@@ -340,7 +343,6 @@ class Novafos:
                 self._meter_data["hour"]["Minimum"] = time_series[0]["Minimum"]
                 self._meter_data["hour"]["LastValidDate"] = time_series[0]["LastValidDate"]
 
-        #_LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
         for hour_data in self._meter_data["hour"]["Data"]:
             _LOGGER.debug(f"{hour_data['DateFrom']} - {hour_data['DateTo']} - {hour_data['Value']}")
         _LOGGER.debug(f"Total/Avg/Min/Max: {self._meter_data['hour']['Total']['Value']} / {self._meter_data['hour']['Average']['Value']} / {self._meter_data['hour']['Minimum']['Value']} / {self._meter_data['hour']['Maximum']['Value']}")

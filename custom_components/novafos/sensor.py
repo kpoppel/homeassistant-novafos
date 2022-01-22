@@ -75,7 +75,7 @@ class NovafosWaterSensor(SensorEntity):
                 # Return the hour data from the dataset at the current hour
                 # Condition: The hour data is exactly from yesterday.  Otherwise return None.
                 # Probably not too useful, but all data is in the attributes.
-                if datetime.strptime(self._sensor_data["LastValidDate"], '%Y-%m-%dT%H:%M:%S%z').day == datetime.now().day-1:
+                if datetime.strptime(self._sensor_data["LastValidDate"], '%Y-%m-%dT%H:%M:%S').day == datetime.now().day-1:
                     return cast(float, self._sensor_data["Data"][datetime.now().hour])["Value"]
                 else:
                     return None
