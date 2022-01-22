@@ -6,8 +6,6 @@ from datetime import timedelta
 import json
 import requests
 import logging
-from .models import RawResponse
-from .models import TimeSeries
 
 _LOGGER = logging.getLogger(__name__)
 
