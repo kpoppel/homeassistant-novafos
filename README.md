@@ -4,7 +4,7 @@
 
 The `novafos`component is a Home Assistant custom component for monitoring your water metering data from Novafos (via KMD)
 
-*This version 1.x is not backwards compatible with the 0.x versions.  If you use 0.x versions and is happy with this do not update before reading this README.  Please remove the integration and add it again after updating.*
+*This version 1.x is not backwards compatible with the 0.x versions.  If you use 0.x versions and is happy with this do not update before reading this README.  Please remove the integration and add it again after updating.  I recommend to try out this version in a test instance of Home Assistant first bevore deciding to upgrade.*
 
 *If something stops working, downgrade and file a bug.*
 
@@ -50,15 +50,15 @@ The integration creates the following sensors:
   * The total consumtion on the last valid date
   * Attributes contain day data since the first day of the month at the correct dates
 * sensor.novafos_hour_total
-  * The hourly consumption on the last valid date
+  * The hourly consumption on the last valid date. The sensor will return unknown if the valid date is older than 24h
   * Attributes contain data from the last 24 hours on the correct date
 * sensor.novafos_valid_date
   * Just the date of the last valid data
 
-All water sensors show their value in cubuc meters (m3).  The sensors also have extended attributes as outlined above, which can be used by ex. apexchart-card to chart data at the correct date.  You can also create new sensors from these attributes to save them in the history database.  Attributes are not saved in the history.
+All water sensors show their value in cubic meters (m3).  The sensors also have extended attributes as outlined above, which can be used by ex. apexchart-card to chart data at the correct date.  You can also create new sensors from these attributes to save them in the history database.  Attributes are not saved in the history.
 
 ## Debugging
-It is possible to debug log the raw response from KMD API. This is done by setting up logging like below in configuration.yaml in Home Assistant. It is also possible to set the log level through a service call in UI.  
+It is possible to debug log the raw response from KMD API. This is done by setting up logging like below in configuration.yaml in Home Assistant. It is also possible to set the log level through a service call in UI. Be aware that a lot of information is dumped to the log, so only have this activated when reporting a bug.
 ```
 logger: 
   default: info
