@@ -33,7 +33,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     password = entry.data['password']
     supplierid = entry.data['supplierid']
     
-    _LOGGER.debug("Novafos ConfigData: {entry.data}")
+    _LOGGER.debug(f"Novafos ConfigData: {entry.data}")
 
     # Add the HomeAssistant specific API to the Novafos integration.
     # The Sensor entity in the integration will call function here to do its thing.

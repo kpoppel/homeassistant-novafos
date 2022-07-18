@@ -1,11 +1,20 @@
 '''
 Primary public module for novafos.dk API wrapper.
 '''
+from __future__ import annotations
+
 from datetime import datetime
 from datetime import timedelta
+import logging
 import json
 import requests
-import logging
+import hashlib
+import re
+import string
+import random
+import base64
+import uuid
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -17,11 +26,10 @@ class Novafos:
         self._username = username
         self._password = password
         self._supplierid = supplierid
-        self._auth_url = f'https://webtools.kmd.dk/'
-        self._api_url = "https://minforsyningplugin2webapi.kmd.dk/"
+        self._api_url = "https://minforsyningplugin2webapi.kmd.dk"
 
-        self._session_id = ""
         self._access_token = ""
+        self._customer_id = ""
         self._active_meters = []
         self._meter_data = {}
         self._last_valid_day = None
@@ -37,41 +45,140 @@ class Novafos:
          "Billing" : 4
         }
 
-    def _get_session_id(self):
-        """
-        Use the username/password/supplierid credentials to login and get a sesion ID.
-        """
-        headers = {"Session-Id":"",
-                   "Customer-Database-Number":self._supplierid,
-                   "Content-Type":"application/x-www-form-urlencoded; charset=UTF-8"
-                  }
-        data = {"username":self._username,
-                "password":self._password,
-                "rememberLogin":"false"
-               }
-        url = f"{self._auth_url}/wts/loginUserPassword"
+    def _print_json(self, map):
+        print(json.dumps(map, indent=4, sort_keys=True, ensure_ascii=False))
 
-        result = requests.post(url, data=data, headers=headers)
-        result_json = result.json()
-        self._session_id = result_json['sessionId']
-        _LOGGER.debug(f"Got session_id (supplierid and user/pass was ok): {self._session_id}")
+    def _generate_random_string(self, size):
+        rand = random.SystemRandom()
+        return ''.join(rand.choices(string.ascii_letters + string.digits, k=size))
 
-    def _get_bearer_token(self):
-        headers = {
-        #        "Accept":"application/json, text/plain, */*"
+    def _generate_code(self) -> tuple[str, str]:
+        rand = random.SystemRandom()
+        code_verifier = ''.join(rand.choices(string.ascii_letters + string.digits, k=67))
+
+        code_sha_256 = hashlib.sha256(code_verifier.encode('utf-8')).digest()
+        b64 = base64.urlsafe_b64encode(code_sha_256)
+        code_challenge = b64.decode('utf-8').replace('=', '')
+
+        return (code_verifier, code_challenge)
+
+    def authenticate(self):
+        """
+        Use the username/password/supplierid credentials to login and get a code token from which to retrieve the Bearer token.
+        """
+        nonce = self._generate_random_string(size=42)
+        state = self._generate_random_string(size=42)
+        code_verifier, code_challenge = self._generate_code()
+        # Tokens generated during the handshake:
+        request_verification_token = None
+        code = None
+
+        # ID determined between Novafos and the OIDC service at KMD
+        client_id = '1DA5CFAF-F67F-4DA1-A1A6-513A7768F994'
+        # Our identification - generate e new one everytime we update data
+        app = uuid.uuid4()
+
+        # The capabilities of the OIDC service can be fetched here:
+        # https://easy-energy-identity.kmd.dk/.well-known/openid-configuration
+        # This is useful for a dynamic setup where different services must be contacted.
+        # Here we know which one and how to do it.
+
+        # The first step is to actually load the login webpage.  KMD made sure to include a hidden form value
+        # probably to ensure the one who submits the form is also the one who loaded it in the first place.
+        ######################
+        # A session is needed for the login part as cookies are exchanged as well.
+        session = requests.Session()
+
+        headers = {}
+
+        params = {
+            'ReturnUrl': f'/oidc/authorize?client_id={client_id}&redirect_uri=https%3A%2F%2Fminforsyning-2.kmd.dk%2Flogin&response_type=code&scope=openid%20profile%20pluginapi_int&nonce={nonce}&state={state}&code_challenge={code_challenge}&code_challenge_method=S256&utility={self._supplierid}&login_type=mf&post_logout_redirect_uri=https%3A%2F%2Fminforsyning-2.kmd.dk%2Flogin&app={app}',
         }
+
+        response = session.get('https://easy-energy-identity.kmd.dk/Identity/Account/Sign/Login', params=params, headers=headers)
+
+        # Get the 'RequestVerificationToken' out of response TEXT:
+        #<input name="__RequestVerificationToken" type="hidden" value="CfDJ8BtjbcM0azZLgmK58SCaJRwb4UK7iGEmt5ENx8EhXvgpt3GFKIwLR4svDgNa0sHp9mNOemf4df0IYV25vmqQD-QFI7Dh7sVcM-D5U-smZpjnu7xajAQEHWx-fT_pzj-jXhOskLj4G22355Z2JysR_tM" /></
+        # It is always 155 characters as well it seems..
+        # If this code is not present, authentication will fail.
+        rvt = re.search(r'(?<=__RequestVerificationToken" type="hidden" value=")([\w-]+)', response.text)
+        request_verification_token = rvt.group(0)
+        _LOGGER.debug('Got login form request_verification_token = %s', request_verification_token)
+
+        # Second step is to submit the login form with the username and password.
+        # In the response from the server we get a secret code to be used later
+        ######################
+        headers = {
+            'content-type': 'application/x-www-form-urlencoded',
+        }
+
+        params = {
+            'returnUrl': f'/oidc/authorize?client_id={client_id}&redirect_uri=https%3A%2F%2Fminforsyning-2.kmd.dk%2Flogin&response_type=code&scope=openid%20profile%20pluginapi_int&nonce={nonce}&state={state}&code_challenge={code_challenge}&code_challenge_method=S256&utility={self._supplierid}&login_type=mf&post_logout_redirect_uri=https%3A%2F%2Fminforsyning-2.kmd.dk%2Flogin&app={app}',
+        }
+
+        data = f'Input.Email={self._username}&Input.Password={self._password}&__RequestVerificationToken={request_verification_token}'
+
+        response = session.post('https://easy-energy-identity.kmd.dk/Identity/Account/Sign/Login', params=params, headers=headers, data=data)
+
+        # At this point user/password should have been accepted. (if "forkert" id in text then login did not succeed)
+
+        # url field contains the next code we need.
+        #  https://minforsyning-2.kmd.dk/login?code=0gRigEdqZKwcB_fdPqaiW3t410UrXLXXEC-eT6vrXuw&state=b%27SP0DKBBZ5YX4L8W4S70E08SD2Q5MSUOIHC05W90D0Y%27
+        code = response.url[41:84]
+
+        # Something is wrong if the code contains the word "Account".  Too many wrong login attempts causes account lockout condition
+        if "Account" in code:
+            _LOGGER.error('Code not retrieved correctly. Plugin will not continue login process.  Check user/pass/supplierID')
+            if "Lockout" in code:
+                _LOGGER.error('The Novafos account is subject to lockout due to too many failed login attempts. You may be subject to a 30 min lockout.')
+            return False
+
+        _LOGGER.debug('Got one-time session code (supplierid and user/pass was ok): %s', code)
+
+        # Third step is to use the code from the authentication service to verify we are the right one
+        # The correct code and the state issued from the beginning must be correct.
+        # Interestingly enough it seems this step can be omitted entirely - keeping it anyway.
+        #####################
+        headers = {}
+
+        params = {
+            'code': code,
+            'state': state,
+        }
+
+        response = requests.get('https://minforsyning-2.kmd.dk/login', params=params, headers=headers)
+
+        # Finally the Bearer token can be retrieved from the oicd token endpoint.
+        # The code is reused to verify we can get the token.
+        #####################
+        headers = {}
 
         data = {
-            "grant_type":"WTSession",
-            "WTSessionId":self._session_id
+            'grant_type': 'authorization_code',
+            'client_id': client_id,
+            'code_verifier': code_verifier, 
+            'code': code,
+            'redirect_uri': 'https://minforsyning-2.kmd.dk/login',
         }
 
-        url = f"{self._api_url}/token"
+        response = requests.post('https://easy-energy-identity.kmd.dk/oidc/token', headers=headers, data=data)
+        self._access_token = f"{response.json()['token_type']} {response.json()['access_token']}"
+        _LOGGER.debug(f'Got bearer token (access to API was Ok) valid for %ss: %s', response.json()['expires_in'], self._access_token)
 
-        result = requests.post(url, data=data, headers=headers)
-        result_json = result.json()
-        self._access_token = f"{result_json['token_type']} {result_json['access_token']}"
-        _LOGGER.debug(f"Got bearer token (access to API was Ok): {self._access_token}")
+        return True
+
+    def _get_customer_id(self):
+        # Need to retrieve the customer ID from the user profile to fetch data.
+        headers = {
+            'Authorization': self._access_token,
+        }
+
+        url = f'{self._api_url}/api/profile/get'
+
+        response = requests.get(url, headers=headers)        
+        #self._print_json(response.json())
+        self._customer_id = f"{response.json()['Customers'][0]['Id']}"
+        _LOGGER.debug("Retrieved customer_id: %s", self._customer_id)
 
     def _get_active_meters(self):
         """
@@ -100,6 +207,7 @@ class Novafos:
         }]
         """
         headers = {
+            'Customer-Id': self._customer_id,
             "Authorization" : self._access_token
         }
 
@@ -109,10 +217,12 @@ class Novafos:
 
         url = f"{self._api_url}/api/meter/customerActiveMeters"
 
-        result = requests.post(url, data=data, headers=headers)
-        result_json = result.json()
+        response = requests.post(url, data=data, headers=headers)
+
+        #self._print_json(response.json())
+        response_json = response.json()
         self._active_meters = []
-        for meter in result_json:
+        for meter in response_json:
             """ Pick up active water measuring meters """
             if meter["IsActive"] == True and meter["ConsumptionTypeId"] == 6:
                 active = {
@@ -121,6 +231,8 @@ class Novafos:
                     "Unit" : meter["Units"][0],
                 }
                 self._active_meters.append(active)
+        _LOGGER.debug('Got active (water) meters : %s', self._active_meters)
+        # TODO: Novafos also measures oil and gas?
 
     def _get_consumption_timeseries(self, dateFrom, dateTo, zoomLevel = 0):
         """Get the timeseries as requested for all meters, based on zoom level and date range.
@@ -190,6 +302,7 @@ class Novafos:
         if this is not the case for you.
         """
         headers = {
+            'Customer-Id': self._customer_id,
             "Authorization" : self._access_token
         }
 
@@ -206,13 +319,13 @@ class Novafos:
                 "DateTo": dateTo,
             }
 
-            url = f"{self._api_url}api/consumption/consumptionTimeSeries"
+            url = f"{self._api_url}/api/consumption/consumptionTimeSeries"
 
             result = requests.post(url, json=data, headers=headers)
             result_json = result.json()
 
             # Enable this to see all returned data from the API:
-            #print(json.dumps(result_json, sort_keys = False, indent = 4))
+            print(json.dumps(result_json, sort_keys = False, indent = 4))
 
             # Clean data so only valid data is returned and register the valid date
             series_data = []
@@ -239,19 +352,6 @@ class Novafos:
                 "LastValidDate" : last_valid_date
                 })
         return meter_data
-
-#    def _get_time_series(self, start_time, end_time, zoom_level):
-#        #...
-#        url = self._base_url + "consumptionView/data"
-#        result = requests.post(url, data=data, headers=self._create_headers())
-#
-#        _LOGGER.debug(f"Response from API. Status: {result.status_code}, Body: {result.text}")
-#
-#        raw_response = RawResponse()
-#        raw_response.status = result.status_code
-#        raw_response.body = result.text
-#
-#        return raw_response
 
     def _get_year_data(self):
         dateFrom = datetime.now().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S.000Z")
@@ -351,8 +451,11 @@ class Novafos:
         '''
         Login and set some numbers needed for the data calls.  Then retrive all data from the API
         '''
-        self._get_session_id()
-        self._get_bearer_token()
+        if not self.authenticate():
+            return None
+
+        self._get_customer_id()
+
         self._get_active_meters()
 
         # NOTE: Returned is the first element in the meters list.
