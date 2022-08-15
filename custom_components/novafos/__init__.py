@@ -73,21 +73,23 @@ class HassNovafos:
             self.data = self._client.get_latest()
             self._last_session = datetime.now()
 
-#        try: 
-#            data = self._client.get_latest()
-#            if data.status == 200:
-#                self.data = data
-#            else:
-#                _LOGGER.warn(f"Error from novafos: {data.status} - {data.detailed_status}")
-#        except requests.exceptions.HTTPError as he:
-#            message = None
-#            if he.response.status_code == 401:
-#                message = f"Unauthorized error while accessing novafos. Wrong or expired credentials or supplier ID?"
-#            else:
-#                message = f"Exception: {e}"
+        # From here -->
+        #try: 
+        #    data = self._client.get_latest()
+        #    if data.status == 200:
+        #        self.data = data
+        #    else:
+        #        _LOGGER.warn(f"Error from novafos: {data.status} - {data.detailed_status}")
+        #except requests.exceptions.HTTPError as he:
+        #    message = None
+        #    if he.response.status_code == 401:
+        #        message = f"Unauthorized error while accessing novafos. Wrong or expired credentials or supplier ID?"
+        #    else:
+        #        message = f"Exception: {e}"
 #
-#            _LOGGER.warn(message)
-#        except: 
-#            e = sys.exc_info()[0]
-#            _LOGGER.warn(f"Exception: {e}")
+        #    _LOGGER.warn(message)
+        #except: 
+        #    e = sys.exc_info()[0]
+        #    _LOGGER.warn(f"Exception: {e}")
+        # <-- To here
         _LOGGER.debug("Done fetching data from Novafos")

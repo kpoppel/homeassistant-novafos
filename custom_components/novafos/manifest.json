@@ -1,9 +1,9 @@
 {
   "domain": "novafos",
   "name": "Novafos",
-  "version": "1.0.0",
+  "version": "2.0.2",
   "config_flow": true,
-  "documentation": "https://www.home-assistant.io/integrations/novafos",
+  "documentation": "https://github.com/kpoppel/homeassistant-novafos",
   "issue_tracker": "https://github.com/kpoppel/homeassistant-novafos/issues",
   "requirements": [],
   "ssdp": [],
