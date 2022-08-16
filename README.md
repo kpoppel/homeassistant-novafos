@@ -4,11 +4,6 @@
 
 The `novafos`component is a Home Assistant custom component for monitoring your water metering data from Novafos (via KMD)
 
-*This version 1.x is not backwards compatible with the 0.x versions.  If you use 0.x versions and is happy with this do not update before reading this README.  Please remove the integration and add it again after updating.  I recommend to try out this version in a test instance of Home Assistant first bevore deciding to upgrade.*
-
-*If something stops working, downgrade and file a bug.*
-
-
 ## Installation
 ---
 ### Manual Installation
@@ -141,24 +136,3 @@ series:
       entity.attributes.data[0]["Value"]]]
 ```
 
-
-
----
-## What is new in v1.x
-
-The v1.x version changes the API endpoint used and the authentication method.  The API used is vastly simplified which makes it much easier to retrieve the data.
-The update was triggered mainly because my data fetched from Novafos stopped in early 2022.  Looking at the website and the data I discovered two things: The last valid data had holes in them and were even 5 days old.  The 0.x version of this module assumes laways that the last valid data is 24 hours delayed.  Secondly I saw that the endpoint for fetching data had changed and that the data looked a lot more intuitive.
-
-One thing I wanted to change as well was to put the data at the right date.  Home assistant sensors do not allow setting historical data at the correct point in time. Looking at sensor attributes and apexchart-card, I saw an opportunity to use attributes to put data at the correct date.
-
-Another thing was the many sensors for 1 hour data.  I do not find a use for saving a sensor which will show me how much water was used at 02:00 over time.  I would however like a single sensor showing me the water used hour by hour.
-
-There is a price to this still because while the sensor will 'reveal' data hour by hour, the data will be revealed at the wrong time due to how sensors work in Home Assistant.
-
-Charting the last valid day at the right date using attributes is now possible.
-
-Charting the water use day-by-day using attributes (for the correct date) or the sensor value is possible.
-
-Charting the water use current month and year total is also possible.
-
-Also added a sensor signalling the last valid date for the data.
