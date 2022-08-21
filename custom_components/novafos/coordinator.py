@@ -15,7 +15,7 @@ from .const import MIN_TIME_BETWEEN_UPDATES
 import logging
 _LOGGER = logging.getLogger(__name__)
 
-class NovafosUpdateCoordinator(DataUpdateCoordinator): #?? [list[NovafosWaterSensor]]):
+class NovafosUpdateCoordinator(DataUpdateCoordinator):
     """DataUpdateCoordinator for Novafos."""
     def __init__(
         self,
@@ -35,7 +35,7 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator): #?? [list[NovafosWaterSen
             update_interval=MIN_TIME_BETWEEN_UPDATES,
         )
 
-    async def _async_update_data(self) -> list[NovafosWaterSensor]:
+    async def _async_update_data(self):
         """Get the data for Novafos."""
         try:
             if not await self.hass.async_add_executor_job(self.api.authenticate):
@@ -43,20 +43,13 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator): #?? [list[NovafosWaterSen
         except InvalidAuth as error:
             raise ConfigEntryAuthFailed from error
 
-        # Retrieve latest data from the API (TODO: Is this supposed to be a list of sensors?)
+        # Retrieve latest data from the API
         try:
             data = await self.hass.async_add_executor_job(self.api.get_latest)
         except Exception as error:
             raise ConfigEntryNotReady from error
 
-        # Verify that we have permission to read the sensors
-        #for sensor in sensors:
-        #    if not sensor.permissions.get("read", False):
-        #        raise ConfigEntryAuthFailed(
-        #            f"This account does not have permission to read {sensor.name}"
-        #        )
-
-        # Return the data (TODO: Should this be a list of sensors?)
+        # Return the data
         # The data is stored in the coordinator as a .data field.
         return data
 

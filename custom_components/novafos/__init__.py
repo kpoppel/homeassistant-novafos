@@ -16,7 +16,6 @@ from custom_components.novafos.pynovafos.novafos import Novafos
 # Development help
 import logging
 _LOGGER = logging.getLogger(__name__)
-import sys
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
