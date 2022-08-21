@@ -1,12 +1,12 @@
 """The novafos integration."""
 from __future__ import annotations
-from datetime import datetime, timedelta
+from custom_components.novafos.coordinator import NovafosUpdateCoordinator
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN, MIN_TIME_BETWEEN_UPDATES
+from .const import DOMAIN
 
 # The Novafos integration - not on PyPi, just bundled here.
 # Contrary to:
@@ -15,8 +15,8 @@ from custom_components.novafos.pynovafos.novafos import Novafos
 
 # Development help
 import logging
-import sys
 _LOGGER = logging.getLogger(__name__)
+import sys
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
@@ -28,20 +28,29 @@ PLATFORMS: list[Platform] = [Platform.SENSOR]
 #    return True
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up novafos from a config entry."""
+    """Set up Novafos from a config entry."""
     username = entry.data['username']
     password = entry.data['password']
     supplierid = entry.data['supplierid']
     
     _LOGGER.debug(f"Novafos ConfigData: {entry.data}")
 
+    # Use the coordinator which handles regular fetch of API data.
+    api = Novafos(username, password, supplierid)
+    coordinator = NovafosUpdateCoordinator(hass, api, entry)
+    # If you do not want to retry setup on failure, use
+    #await coordinator.async_refresh()
+    # This one repeats connecting to the API until first success.
+    await coordinator.async_config_entry_first_refresh()
+
     # Add the HomeAssistant specific API to the Novafos integration.
     # The Sensor entity in the integration will call function here to do its thing.
     hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = HassNovafos(username, password, supplierid)
+    hass.data[DOMAIN][entry.entry_id] = {
+        "coordinator" : coordinator
+    }
 
     hass.config_entries.async_setup_platforms(entry, PLATFORMS)
-
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -51,45 +60,3 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok
-
-from homeassistant.util import Throttle
-import requests
-
-class HassNovafos:
-    """Home-Assistant specific API for Novafos."""
-    def __init__(self, username, password, supplierid):
-        self.supplierid = supplierid
-        self.data = {}
-        self._client = Novafos(username, password, supplierid)
-        self._last_session = None
-        _LOGGER.debug("A HassNovafos class was created")
-
-    # The Throttle annotation sets a limit to how often we update data. See const.py
-    @Throttle(MIN_TIME_BETWEEN_UPDATES)
-    def update(self):
-        _LOGGER.debug("Fetching data from Novafos")
-        # If debugging, the try/catch can be annoying. Use this line and comment away the rest.
-        if self._last_session == None or (datetime.now()-self._last_session) >= timedelta(minutes=60):
-            self.data = self._client.get_latest()
-            self._last_session = datetime.now()
-
-        # From here -->
-        #try: 
-        #    data = self._client.get_latest()
-        #    if data.status == 200:
-        #        self.data = data
-        #    else:
-        #        _LOGGER.warn(f"Error from novafos: {data.status} - {data.detailed_status}")
-        #except requests.exceptions.HTTPError as he:
-        #    message = None
-        #    if he.response.status_code == 401:
-        #        message = f"Unauthorized error while accessing novafos. Wrong or expired credentials or supplier ID?"
-        #    else:
-        #        message = f"Exception: {e}"
-#
-        #    _LOGGER.warn(message)
-        #except: 
-        #    e = sys.exc_info()[0]
-        #    _LOGGER.warn(f"Exception: {e}")
-        # <-- To here
-        _LOGGER.debug("Done fetching data from Novafos")

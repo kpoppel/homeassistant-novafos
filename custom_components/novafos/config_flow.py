@@ -1,7 +1,6 @@
 """Config flow for Novafos integration."""
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 import voluptuous as vol
@@ -14,7 +13,11 @@ from homeassistant.const import CONF_NAME
 
 from .const import DEFAULT_NAME, DOMAIN
 
+import logging
 _LOGGER = logging.getLogger(__name__)
+
+from custom_components.novafos.pynovafos.novafos import Novafos, LoginFailed, HTTPFailed
+
 
 # Username and password is the ones for the website.
 # Supplier ID is the "customer database identifier", a 6 digit number gotten off the website.
@@ -27,48 +30,24 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
     }
 )
 
-class PlaceholderHub:
-    """Placeholder class to make tests pass.
-
-    TODO Remove this placeholder class and replace with things from your PyPI package.
-    """
-
-    def __init__(self, supplier: str) -> None:
-        """Initialize."""
-        self.supplier = supplier
-
-    async def authenticate(self, username: str, password: str) -> bool:
-        """Test if we can authenticate with the supplier."""
-        return True
-
-
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
     """Validate the user input allows us to connect.
 
     Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
     """
-    # TODO validate the data can be used to set up a connection.
-
-    # If your PyPI package is not built with async, pass your methods
-    # to the executor:
-    # await hass.async_add_executor_job(
-    #     your_validate_func, data["username"], data["password"]
-    # )
-
-    hub = PlaceholderHub(data["supplierid"])
-
-    if not await hub.authenticate(data["username"], data["password"]):
+    # Returns True or False.  The API is not built for async operation
+    # therefore it is wrapped in an async executor function.
+    try:
+        api = Novafos(data["username"], data["password"], data["supplierid"])
+        await hass.async_add_executor_job(api.authenticate)
+    except LoginFailed:
         raise InvalidAuth
-
-    # If you cannot connect:
-    # throw CannotConnect
-    # If the authentication is wrong:
-    # InvalidAuth
+    except HTTPFailed:
+        raise CannotConnect
 
     # Return info to store in the config entry.
     # title becomes the title on the integrations screen in the UI
     return {"title": f"Novafos {data['supplierid']}"}
-
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for novafos."""

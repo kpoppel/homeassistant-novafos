@@ -16,4 +16,6 @@ nov._get_customer_id()
 nov._get_active_meters()
 nov._get_day_data()
 
+# Or do it all:
+#nov.authenticate()
 #nov.get_latest()

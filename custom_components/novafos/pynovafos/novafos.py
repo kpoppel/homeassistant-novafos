@@ -18,6 +18,12 @@ import uuid
 
 _LOGGER = logging.getLogger(__name__)
 
+class LoginFailed(Exception):
+    """"Exception class for bad credentials"""
+
+class HTTPFailed(Exception):
+    """Exception class for API HTTP failures"""
+
 class Novafos:
     '''
     Primary exported interface for KMD API wrapper.
@@ -128,10 +134,9 @@ class Novafos:
 
         # Something is wrong if the code contains the word "Account".  Too many wrong login attempts causes account lockout condition
         if "Account" in code:
-            _LOGGER.error('Code not retrieved correctly. Plugin will not continue login process.  Check user/pass/supplierID')
-            if "Lockout" in code:
-                _LOGGER.error('The Novafos account is subject to lockout due to too many failed login attempts. You may be subject to a 30 min lockout.')
-            return False
+            raise LoginFailed('Code not retrieved correctly. Plugin will not continue login process.  Check user/pass/supplierID')
+        if "Lockout" in code:
+            raise('The Novafos account is subject to lockout due to too many failed login attempts. You may be subject to a 30 min lockout.')
 
         _LOGGER.debug('Got one-time session code (supplierid and user/pass was ok): %s', code)
 
@@ -448,12 +453,6 @@ class Novafos:
         _LOGGER.debug(f"Total/Avg/Min/Max: {self._meter_data['hour']['Total']['Value']} / {self._meter_data['hour']['Average']['Value']} / {self._meter_data['hour']['Minimum']['Value']} / {self._meter_data['hour']['Maximum']['Value']}")
 
     def get_latest(self):
-        '''
-        Login and set some numbers needed for the data calls.  Then retrive all data from the API
-        '''
-        if not self.authenticate():
-            return None
-
         self._get_customer_id()
 
         self._get_active_meters()
