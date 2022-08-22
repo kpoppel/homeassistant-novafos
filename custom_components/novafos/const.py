@@ -15,7 +15,7 @@ DEFAULT_NAME = "Novafos"
 ######################################################################
 ##  NOTICE ON FAIR USE:
 ##  Please do not set this constant below 15 minutes.
-##  You wil risk an IP-ban if fair use is not adhered to.
+##  You will risk an IP-ban if fair use is not adhered to.
 ##
 ##  The dataset is updated every 24 hours in the morning.
 ##  The default min. time is to spread out load on the API and still
