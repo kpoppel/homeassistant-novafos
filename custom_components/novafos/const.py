@@ -12,10 +12,19 @@ DOMAIN = "novafos"
 # Default name for sensor prefix texts (possibly other things)
 DEFAULT_NAME = "Novafos"
 
+######################################################################
+##  NOTICE ON FAIR USE:
+##  Please do not set this constant below 15 minutes.
+##  You wil risk an IP-ban if fair use is not adhered to.
+##
+##  The dataset is updated every 24 hours in the morning.
+##  The default min. time is to spread out load on the API and still
+##  retrieve data.
+######################################################################
 # Every 6 hours seems appropriate to get an update ready in the morning
 MIN_TIME_BETWEEN_UPDATES = timedelta(hours=6)
-# Sure, let's bash the API service.. But useful when trying to get results fast.
-#MIN_TIME_BETWEEN_UPDATES = timedelta(minutes=1)
+# Smallest appropriate interval.  Only relevant for development use.
+#MIN_TIME_BETWEEN_UPDATES = timedelta(minutes=15)
 
 # Sensors:
 # NOTE: For ALL sensors it is NOT the current day number which is received.
@@ -27,7 +36,7 @@ MIN_TIME_BETWEEN_UPDATES = timedelta(hours=6)
 # *  Month Total (resets once per month) - attribute stating last valid data date
 # *  Day Total for "last valid" -  attribute stating last valid data date
 # *  Make an hourly "last valid" sensor which returns the data from the correct hour some days ago.
-#    This should be for those not setting out Apexchards using the attributes.
+#    This should be for those not setting up Apexchards using the attributes.
 SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
     NovafosSensorDescription(
         key = "year",
