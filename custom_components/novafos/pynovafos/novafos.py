@@ -347,6 +347,16 @@ class Novafos:
                         # NOTE: Assuming data is sorted by date - which it is
                         last_valid_date = data["DateTo"]
 
+            # If there is no data, like just after a month transition, set a dummy entry
+            if len(series_data) == 0:
+                dummyDate = datetime.strptime(dateTo, "%Y-%m-%dT%H:%M:%S.000Z").strftime("%Y-%m-%dT%H:%M:%S+0000")
+                series_data.append({
+                    "DateFrom" : dummyDate,
+                    "DateTo" : dummyDate,
+                    "Value" : 0.0
+                })
+                last_valid_date = dummyDate
+
             # Return first data series.  Unknown how more series could come from a single metering device?
             meter_data.append({
                 "Data" : series_data,
@@ -356,6 +366,7 @@ class Novafos:
                 "Minimum": result_json["Minimum"],
                 "LastValidDate" : last_valid_date
                 })
+
         return meter_data
 
     def _get_year_data(self):
