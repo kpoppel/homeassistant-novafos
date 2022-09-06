@@ -86,5 +86,9 @@ class NovafosWaterSensor(CoordinatorEntity, SensorEntity):
                 return None
         elif self.entity_description.key == "valid_date":
             return cast(datetime, datetime.strptime(self._sensor_data["Value"], '%Y-%m-%dT%H:%M:%S%z'))
-        else:
+        elif self._sensor_data["Data"]:
+            # If the data array is present, return its value.
+            # In some instances the data-fetch cannot fetch data from the API endpoint
             return cast(float, self._sensor_data["Data"][-1]["Value"])
+        else:
+            return None

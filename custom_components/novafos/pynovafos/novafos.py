@@ -330,7 +330,7 @@ class Novafos:
             result_json = result.json()
 
             # Enable this to see all returned data from the API:
-            print(json.dumps(result_json, sort_keys = False, indent = 4))
+            _LOGGER.debug(json.dumps(result_json, sort_keys = False, indent = 4))
 
             # Clean data so only valid data is returned and register the valid date
             series_data = []
@@ -346,16 +346,6 @@ class Novafos:
                         })
                         # NOTE: Assuming data is sorted by date - which it is
                         last_valid_date = data["DateTo"]
-
-            # If there is no data, like just after a month transition, set a dummy entry
-            if len(series_data) == 0:
-                dummyDate = datetime.strptime(dateTo, "%Y-%m-%dT%H:%M:%S.000Z").strftime("%Y-%m-%dT%H:%M:%S+0000")
-                series_data.append({
-                    "DateFrom" : dummyDate,
-                    "DateTo" : dummyDate,
-                    "Value" : 0.0
-                })
-                last_valid_date = dummyDate
 
             # Return first data series.  Unknown how more series could come from a single metering device?
             meter_data.append({
@@ -378,8 +368,11 @@ class Novafos:
         if self._last_valid_day:
             self._meter_data["year"]["LastValidDate"] = self._last_valid_day
 
-        #_LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
-        _LOGGER.debug(f"Year Total: {time_series[0]['Total']['Value']}")
+        if time_series[0]['Data']:
+            #_LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
+            _LOGGER.debug(f"Year Total: {time_series[0]['Total']['Value']}")
+        else:
+            _LOGGER.warning("The KMD API returned no yearly data.  Expect sensors to signal 'unavailable'")
 
     def _get_month_data(self):
         # These get all months of the year
@@ -397,9 +390,12 @@ class Novafos:
             self._meter_data["month"]["LastValidDate"] = self._last_valid_day
 
         #_LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
-        for month_data in time_series[0]['Data']:
-            _LOGGER.debug(f"{month_data['DateFrom']} - {month_data['DateTo']} - {month_data['Value']}")
-        _LOGGER.debug(f"Month Total/Avg/Min/Max: {time_series[0]['Total']['Value']} / {time_series[0]['Average']['Value']} / {time_series[0]['Minimum']['Value']} / {time_series[0]['Maximum']['Value']}")
+        if time_series[0]['Data']:
+            for month_data in time_series[0]['Data']:
+                _LOGGER.debug(f"{month_data['DateFrom']} - {month_data['DateTo']} - {month_data['Value']}")
+            _LOGGER.debug(f"Month Total/Avg/Min/Max: {time_series[0]['Total']['Value']} / {time_series[0]['Average']['Value']} / {time_series[0]['Minimum']['Value']} / {time_series[0]['Maximum']['Value']}")
+        else:
+            _LOGGER.warning("The KMD API returned no monthly data.  Expect sensors to signal 'unavailable'")
 
     def _get_day_data(self):
         now = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -409,12 +405,16 @@ class Novafos:
         time_series = self._get_consumption_timeseries(dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level['Day'])
         self._meter_data["day"] = time_series[0]
 
-        #_LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
         #self._last_valid_day = self._meter_data["day"]["Data"][-1]["DateFrom"]
         self._last_valid_day = self._meter_data["day"]["LastValidDate"]
-        for day_data in time_series[0]['Data']:
-            _LOGGER.debug(f"{day_data['DateFrom']} - {day_data['DateTo']} - {day_data['Value']}")
-        _LOGGER.debug(f"Day Total/Avg/Min/Max/ValidDate: {time_series[0]['Total']['Value']} / {time_series[0]['Average']['Value']} / {time_series[0]['Minimum']['Value']} / {time_series[0]['Maximum']['Value']} / {self._last_valid_day}")
+
+        #_LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
+        if time_series[0]['Data']:
+            for day_data in time_series[0]['Data']:
+                _LOGGER.debug(f"{day_data['DateFrom']} - {day_data['DateTo']} - {day_data['Value']}")
+            _LOGGER.debug(f"Day Total/Avg/Min/Max/ValidDate: {time_series[0]['Total']['Value']} / {time_series[0]['Average']['Value']} / {time_series[0]['Minimum']['Value']} / {time_series[0]['Maximum']['Value']} / {self._last_valid_day}")
+        else:
+            _LOGGER.warning("The KMD API returned no daily data.  Expect sensors to signal 'unavailable'")
 
     def _get_hour_data(self, days_back = None, from_date = None):
         """
@@ -444,7 +444,6 @@ class Novafos:
             #dateTo = now.replace(hour=23, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S.000Z")
             _LOGGER.debug(f"Getting Hour data {day} day(s) back in time from {dateFrom} to {dateTo}")
             time_series = self._get_consumption_timeseries(dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level['Hour'])
-            #_LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
 
             if first_day:
                 self._meter_data["hour"] = time_series[0]
@@ -459,9 +458,14 @@ class Novafos:
                 self._meter_data["hour"]["Minimum"] = time_series[0]["Minimum"]
                 self._meter_data["hour"]["LastValidDate"] = time_series[0]["LastValidDate"]
 
-        for hour_data in self._meter_data["hour"]["Data"]:
-            _LOGGER.debug(f"{hour_data['DateFrom']} - {hour_data['DateTo']} - {hour_data['Value']}")
-        _LOGGER.debug(f"Total/Avg/Min/Max: {self._meter_data['hour']['Total']['Value']} / {self._meter_data['hour']['Average']['Value']} / {self._meter_data['hour']['Minimum']['Value']} / {self._meter_data['hour']['Maximum']['Value']}")
+        #_LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
+        if time_series[0]['Data']:
+            for hour_data in self._meter_data["hour"]["Data"]:
+                _LOGGER.debug(f"{hour_data['DateFrom']} - {hour_data['DateTo']} - {hour_data['Value']}")
+            _LOGGER.debug(f"Total/Avg/Min/Max: {self._meter_data['hour']['Total']['Value']} / {self._meter_data['hour']['Average']['Value']} / {self._meter_data['hour']['Minimum']['Value']} / {self._meter_data['hour']['Maximum']['Value']}")
+        else:
+            _LOGGER.warning("The KMD API returned no hourly data.  Expect sensors to signal 'unavailable'")
+
 
     def get_latest(self):
         self._get_customer_id()
