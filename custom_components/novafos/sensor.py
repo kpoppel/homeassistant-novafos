@@ -56,20 +56,20 @@ class NovafosWaterSensor(CoordinatorEntity, SensorEntity):
 
         self._attr_name = f"{name} {description.name}"
         self._attr_unique_id = f"{name.lower()}-{coordinator.supplierid}-{description.key}"
-        # Data is resolved from here - relies on the fact that first sync is successful:
-        self._sensor_data = coordinator.data[self.entity_description.key]
+
+        # Note: Data is stored in self.coordinator.data[self.entity_description.key]
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
         if self.entity_description.key in ("month", "day", "hour"):
-            self._attrs["last_valid_date"] = self._sensor_data["LastValidDate"]
-            self._attrs["average"] = self._sensor_data["Average"]
-            self._attrs["maximum"] = self._sensor_data["Maximum"]
-            self._attrs["minimum"] = self._sensor_data["Minimum"]
-            self._attrs["data"] = self._sensor_data["Data"]
+            self._attrs["last_valid_date"] = self.coordinator.data[self.entity_description.key]["LastValidDate"]
+            self._attrs["average"] = self.coordinator.data[self.entity_description.key]["Average"]
+            self._attrs["maximum"] = self.coordinator.data[self.entity_description.key]["Maximum"]
+            self._attrs["minimum"] = self.coordinator.data[self.entity_description.key]["Minimum"]
+            self._attrs["data"] = self.coordinator.data[self.entity_description.key]["Data"]
         elif self.entity_description.key == "year":
-            self._attrs["last_valid_date"] = self._sensor_data["LastValidDate"]
+            self._attrs["last_valid_date"] = self.coordinator.data[self.entity_description.key]["LastValidDate"]
         else:
             self._attrs = {}
         return self._attrs
@@ -80,15 +80,15 @@ class NovafosWaterSensor(CoordinatorEntity, SensorEntity):
             # Return the hour data from the dataset at the current hour
             # Condition: The hour data is exactly from yesterday.  Otherwise return None.
             # Probably not too useful, but all data is in the attributes.
-            if datetime.strptime(self._sensor_data["LastValidDate"], '%Y-%m-%dT%H:%M:%S').day == datetime.now().day-1:
-                return cast(float, self._sensor_data["Data"][datetime.now().hour])["Value"]
+            if datetime.strptime(self.coordinator.data[self.entity_description.key]["LastValidDate"], '%Y-%m-%dT%H:%M:%S').day == datetime.now().day-1:
+                return cast(float, self.coordinator.data[self.entity_description.key]["Data"][datetime.now().hour])["Value"]
             else:
                 return None
         elif self.entity_description.key == "valid_date":
-            return cast(datetime, datetime.strptime(self._sensor_data["Value"], '%Y-%m-%dT%H:%M:%S%z'))
-        elif self._sensor_data["Data"]:
+            return cast(datetime, datetime.strptime(self.coordinator.data[self.entity_description.key]["Value"], '%Y-%m-%dT%H:%M:%S%z'))
+        elif self.coordinator.data[self.entity_description.key]["Data"]:
             # If the data array is present, return its value.
             # In some instances the data-fetch cannot fetch data from the API endpoint
-            return cast(float, self._sensor_data["Data"][-1]["Value"])
+            return cast(float, self.coordinator.data[self.entity_description.key]["Data"][-1]["Value"])
         else:
             return None
