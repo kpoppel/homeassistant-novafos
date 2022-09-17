@@ -4,6 +4,38 @@
 
 The `novafos`component is a Home Assistant custom component for monitoring your water metering data from Novafos (via KMD)
 
+# Notice on integration status
+
+Novafos and probably other suppliers changed their login page to use a hidden reCAPTCHA.  The very purpose of reCAPTCHA is to tell humans and machines apart.
+The effect of this little change is that the plugin is basically rendered useless except for the workaround implemented in this release.
+
+This is _your_ data.  If you want to ensure free and opensource access to your data in your own home, please help KMD realise there is a need for this.  Sure the claim can be that you have free access to your data through the portal, and even through the Watts app only available on mobile devices.  These are all closed source solutions however, and eliminates homegrown solutions like Home Assistant to thrive.
+
+If you use the integration please write to KMD Easy-energy, or call their contact number to ask for this.  You can even give an example of where this actually works by referring to eloverblik.dk where a personal access token can be generated and used by your own tools.
+
+Until KMD Easy-energy agrees to provide open access to your own data, the integration needs a little help now and then.  This is how it has to work:
+
+1. Use F12 inyour browser to turn on developer tools
+1. Login using your browser as you would do without Home Assistant.
+1. Investigate the network traffic and find the line including "token"
+1. Switch to the Response tab. You see this:
+   ```
+   {
+     "access_token": "<token>",
+     "token_type": "Bearer",
+     "expires_in": 3599,
+     "scope": "openid profile pluginapi_int",
+     "id_token": "<id token>"
+   }   
+   ```
+1. Go to the integration page in settings and select "Configure" on the Novafos integration.
+1. Copy the `access_token` part into the Access Token field (this is a 1506 long character string)
+1. The integration will sense the token changed and trigger only within the next 45 minutes to update the sensors.
+1. Data is fetched as usual.
+1. Repeat as often as you like - you are using a token generated from a human interaction, satisfying the login process.
+
+Encourage Novafos, and KMD Easy-energy to let you access your data through OpenSource using a personal API key associated with your own account.
+
 ## Installation
 ---
 ### Manual Installation
@@ -26,7 +58,6 @@ Fully configurable through config flow.
      If you haven't done this before you need to login using NemId/MitId and
      setup email and password first.
   4. Enter the supplier ID as well.  Until a better way to get this automatically is identified, you can get the value from inspecting the browser network traffic. See the next section.<br>
-
 
 ### Get the supplier id
 

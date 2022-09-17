@@ -18,5 +18,15 @@
                 }
             }
         }
-    }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "data": {
+                "access_token": "Insert a working access token",
+                "access_token_date_updated": "Do not change this field. Autofilled date/time of updating the token."
+                }
+            }
+        }
+    }    
 }

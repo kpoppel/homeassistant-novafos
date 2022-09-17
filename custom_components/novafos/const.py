@@ -21,8 +21,10 @@ DEFAULT_NAME = "Novafos"
 ##  The default min. time is to spread out load on the API and still
 ##  retrieve data.
 ######################################################################
+# NOTE: Due to reCAPTCHA login screen, automatic updates is set to a very large number
+MIN_TIME_BETWEEN_UPDATES = timedelta(days=365)
 # Every 6 hours seems appropriate to get an update ready in the morning
-MIN_TIME_BETWEEN_UPDATES = timedelta(hours=6)
+#MIN_TIME_BETWEEN_UPDATES = timedelta(hours=6)
 # Smallest appropriate interval.  Only relevant for development use.
 #MIN_TIME_BETWEEN_UPDATES = timedelta(minutes=15)
 

@@ -26,6 +26,7 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
         """Initialize DataUpdateCoordinator"""
         self.api = api
         self.hass = hass
+        self.entry = entry
         self.supplierid = entry.data['supplierid']
         
         super().__init__(
@@ -38,7 +39,10 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         """Get the data for Novafos."""
         try:
-            if not await self.hass.async_add_executor_job(self.api.authenticate):
+            # NOTE: Re-enable if login screen reCAPTCHA is removed:
+            # if not await self.hass.async_add_executor_job(self.api.authenticate):
+            # for now use this line:
+            if not await self.hass.async_add_executor_job(self.api.authenticate_using_access_token, self.entry.options['access_token'], self.entry.options['access_token_date_updated']):
                 raise InvalidAuth
         except InvalidAuth as error:
             raise ConfigEntryAuthFailed from error

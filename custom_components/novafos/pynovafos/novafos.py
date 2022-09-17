@@ -40,6 +40,9 @@ class Novafos:
         self._meter_data = {}
         self._last_valid_day = None
 
+        # NOTE: Added because of reCAPCTHA login screen
+        self._access_token_date_updated = ""
+
         """
         Zoom level is the granuarity of the retrieved data
         """
@@ -68,8 +71,24 @@ class Novafos:
 
         return (code_verifier, code_challenge)
 
+    def authenticate_using_access_token(self, access_token, access_token_date_updated):
+        """ The only reason for this function is due to to a reCAPTCHA challenge on the Novafos login page.
+            The date is used to verify the token is not too old when getting data.
+        """
+        self._access_token_date_updated = access_token_date_updated
+        # Make a simple validation of the access_token length and only update if it has the correct length
+        if len(access_token) == 1505:
+            self._access_token = "Bearer "+access_token
+        else:
+            self._access_token = ""
+            _LOGGER.error(f"Token update does not seem to have a valid length. Please check again. (This message is normal the first time the integration starts)")
+        _LOGGER.debug("Access token set to: '%s' at date: '%s'", self._access_token, self._access_token_date_updated)
+
+        return True
+
     def authenticate(self):
         """
+        The OIDC login procedure automated.
         Use the username/password/supplierid credentials to login and get a code token from which to retrieve the Bearer token.
         """
         nonce = self._generate_random_string(size=42)
@@ -126,7 +145,7 @@ class Novafos:
 
         response = session.post('https://easy-energy-identity.kmd.dk/Identity/Account/Sign/Login', params=params, headers=headers, data=data)
 
-        # At this point user/password should have been accepted. (if "forkert" id in text then login did not succeed)
+        # At this point user/password should have been accepted. (if "forkert" is in text then login did not succeed)
 
         # url field contains the next code we need.
         #  https://minforsyning-2.kmd.dk/login?code=0gRigEdqZKwcB_fdPqaiW3t410UrXLXXEC-eT6vrXuw&state=b%27SP0DKBBZ5YX4L8W4S70E08SD2Q5MSUOIHC05W90D0Y%27
@@ -168,6 +187,7 @@ class Novafos:
 
         response = requests.post('https://easy-energy-identity.kmd.dk/oidc/token', headers=headers, data=data)
         self._access_token = f"{response.json()['token_type']} {response.json()['access_token']}"
+
         _LOGGER.debug(f'Got bearer token (access to API was Ok) valid for %ss: %s', response.json()['expires_in'], self._access_token)
 
         return True
@@ -468,6 +488,57 @@ class Novafos:
 
 
     def get_latest(self):
+        # NOTE: This part is all due to login screen reCAPTCHA down to ^^
+        now = datetime.now()
+        # Allow 45 minutes since the last token update.  If updating after this point, return dummy data.
+        if self._access_token == "" or datetime.strptime(self._access_token_date_updated, '%Y-%m-%dT%H:%M:%S') + timedelta(minutes=45) < now:
+            _LOGGER.debug("access_token too old or not set correctly:")
+            dateTo =  now.strftime("%Y-%m-%dT%H:%M:%S+00:00")
+            dateTwo =  now.strftime("%Y-%m-%dT%H:%M:%S")
+            return {
+                    'day': {
+                        'Data': [
+                            {'DateFrom': None, 'DateTo': None, 'Value': None},
+                        ],
+                        'Total':   {'Value': None, 'DateFrom': None, 'DateTo': None},
+                        'Average': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                        'Maximum': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                        'Minimum': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                        'LastValidDate': dateTo
+                    },
+                    'year': {
+                        'Data': [
+                            {'DateFrom': None, 'DateTo': None, 'Value': None}
+                        ],
+                        'Total':   {'Value': None, 'DateFrom': None, 'DateTo': None},
+                        'Average': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                        'Maximum': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                        'Minimum': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                        'LastValidDate': dateTo
+                    },
+                    'month': {
+                        'Data': [
+                            {'DateFrom': None, 'DateTo': None, 'Value': None}
+                        ],
+                        'Total':   {'Value': None, 'DateFrom': None, 'DateTo': None},
+                        'Average': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                        'Maximum': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                        'Minimum': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                        'LastValidDate': dateTo
+                    },
+                    'hour': {
+                        'Data': [
+                            {'DateFrom': None, 'DateTo': None, 'Value': None},
+                        ],
+                        'Total':   {'Value': None, 'DateFrom': None, 'DateTo': None},
+                        'Average': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                        'Maximum': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                        'Minimum': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                        'LastValidDate': dateTwo
+                        },
+                        'valid_date': {'Value': dateTo }
+                    }
+        ###^^^^^
         self._get_customer_id()
 
         self._get_active_meters()

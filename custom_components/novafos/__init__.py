@@ -26,6 +26,15 @@ PLATFORMS: list[Platform] = [Platform.SENSOR]
 #      hass.data.setdefault(DOMAIN, {})
 #    return True
 
+async def update_listener(hass, entry):
+    """Handle options update.
+       options are available at entry.options['']
+
+       This code added because of reCAPTCHA login screen
+    """
+    _LOGGER.debug(f"Options updated: {entry.options['access_token']} and {entry.options['access_token_date_updated']}")
+    await hass.data[DOMAIN][entry.entry_id]['coordinator'].async_request_refresh()
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Novafos from a config entry."""
     username = entry.data['username']
@@ -38,9 +47,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     api = Novafos(username, password, supplierid)
     coordinator = NovafosUpdateCoordinator(hass, api, entry)
     # If you do not want to retry setup on failure, use
-    #await coordinator.async_refresh()
+    await coordinator.async_refresh()
     # This one repeats connecting to the API until first success.
-    await coordinator.async_config_entry_first_refresh()
+    # NOTE: Disabled because of login screen reCAPTCHA - need a valid token to perform refresh.
+    #await coordinator.async_config_entry_first_refresh()
 
     # Add the HomeAssistant specific API to the Novafos integration.
     # The Sensor entity in the integration will call function here to do its thing.
@@ -48,6 +58,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = {
         "coordinator" : coordinator
     }
+
+    # NOTE: Added because of login screen reCAPTCHA:
+    # Option to add a listener which is called whenever configuration options is changed on the integration
+    entry.async_on_unload(entry.add_update_listener(update_listener))
 
     hass.config_entries.async_setup_platforms(entry, PLATFORMS)
     return True
@@ -59,3 +73,22 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok
+
+async def async_migrate_entry(hass, config_entry: ConfigEntry) -> bool:
+    """Handle migration of setup entry data from one version to the next."""
+    _LOGGER.info("Migrating from version %s", config_entry.version)
+
+    if config_entry.version == 1:
+
+        new = {**config_entry.options}
+        # Data:
+        # {'supplierid': '...', 'password': '...', 'username': '...', 'access_token': <string>, 'access_token_date_updated': <string (and hidden)>}
+        new['access_token'] = ""
+        new['access_token_date_updated'] = ""
+
+        config_entry.version = 2
+        hass.config_entries.async_update_entry(config_entry, options=new)
+
+        _LOGGER.info("Migration to version %s successful", config_entry.version)
+
+    return True

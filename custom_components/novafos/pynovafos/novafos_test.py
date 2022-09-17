@@ -1,3 +1,6 @@
+import sys
+sys.path.append(r'/srv/homeassistant/lib/python3.10/site-packages')
+
 import logging
 from novafos import Novafos
 import json
