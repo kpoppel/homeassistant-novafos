@@ -77,7 +77,7 @@ class Novafos:
         """
         self._access_token_date_updated = access_token_date_updated
         # Make a simple validation of the access_token length and only update if it has the correct length
-        if len(access_token) == 1505:
+        if len(access_token) >= 1505:
             self._access_token = "Bearer "+access_token
         else:
             self._access_token = ""
