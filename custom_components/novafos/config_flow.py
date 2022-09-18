@@ -40,13 +40,15 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     """
     # Returns True or False.  The API is not built for async operation
     # therefore it is wrapped in an async executor function.
-    try:
-        api = Novafos(data["username"], data["password"], data["supplierid"])
-        await hass.async_add_executor_job(api.authenticate)
-    except LoginFailed:
-        raise InvalidAuth
-    except HTTPFailed:
-        raise CannotConnect
+    # NOTE: disabled due to reCAPTCHA login screen
+    #try:
+    #    api = Novafos(data["username"], data["password"], data["supplierid"])
+    #    await hass.async_add_executor_job(api.authenticate)
+    #except LoginFailed:
+    #    raise InvalidAuth
+    #except HTTPFailed:
+    #    raise CannotConnect
+    # NOTE: ^^^^ to here
 
     # Return info to store in the config entry.
     # title becomes the title on the integrations screen in the UI
