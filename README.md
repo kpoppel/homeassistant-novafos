@@ -29,7 +29,7 @@ Until KMD Easy-energy agrees to provide open access to your own data, the integr
    }   
    ```
 1. Go to the integration page in settings and select "Configure" on the Novafos integration.
-1. Copy the `access_token` part into the Access Token field (this is a 1506 long character string)
+1. Copy the `access_token` part into the Access Token field (this is at least a 1506 long character string)
 1. The integration will sense the token changed and trigger only within the next 45 minutes to update the sensors.
 1. Data is fetched as usual.
 1. Repeat as often as you like - you are using a token generated from a human interaction, satisfying the login process.
