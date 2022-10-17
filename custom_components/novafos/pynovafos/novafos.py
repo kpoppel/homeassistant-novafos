@@ -15,6 +15,16 @@ import random
 import base64
 import uuid
 
+# Automate recaptcha
+from seleniumwire import webdriver
+
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.firefox.options import Options
+import time
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -43,9 +53,10 @@ class Novafos:
         # NOTE: Added because of reCAPCTHA login screen
         self._access_token_date_updated = ""
 
-        """
-        Zoom level is the granuarity of the retrieved data
-        """
+        # TODO: Add docker host config here instead of directly on the authentication function.
+        # ...
+
+        # Zoom level is the granuarity of the retrieved data
         self._zoom_level = {
          "Year"    : 0,
          "Month"   : 1,
@@ -70,6 +81,34 @@ class Novafos:
         code_challenge = b64.decode('utf-8').replace('=', '')
 
         return (code_verifier, code_challenge)
+
+    def authenticate_using_selenium(self, selenium_host_url):
+        """ This function relies on a remote browser controlled by selenium.  While the recaptcha will eventually
+            figure out this is an automated login, it might just work most of the time.
+            The code varies the time from data is entered (as a password manager vould do) to the point where
+            <ENTER> is 'pressed'.
+            If using selenium/standalone-firefox, access the VNC terminal to check up on things.
+        """
+        self._access_token_date_updated = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+        data = {
+             "username": self._username,
+             "password": self._password,
+             "supplierid": self._supplierid[0:3]
+        }
+        # The selenium response is copying the reponse from the oidc endpoint.
+        response = requests.post(selenium_host_url, json=data)
+        try:
+            response_dict = json.loads(response.json())
+            if response_dict['access_token'] == "":
+                _LOGGER.error('Failed to retrieve bearer token (maybe you are a robot?)')
+                self._access_token = ""
+                return False
+            self._access_token = f"{response_dict['token_type']} {response_dict['access_token']}"
+            _LOGGER.debug('Got bearer token (access to API was Ok) valid for %ss: %s', response_dict['expires_in'], self._access_token)
+            return True
+        except:
+            _LOGGER.error('Failed to retrieve bearer token (no JSON returned)')
+            return False
 
     def authenticate_using_access_token(self, access_token, access_token_date_updated):
         """ The only reason for this function is due to to a reCAPTCHA challenge on the Novafos login page.

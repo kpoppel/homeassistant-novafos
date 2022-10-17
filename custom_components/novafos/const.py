@@ -22,9 +22,10 @@ DEFAULT_NAME = "Novafos"
 ##  retrieve data.
 ######################################################################
 # NOTE: Due to reCAPTCHA login screen, automatic updates is set to a very large number
-MIN_TIME_BETWEEN_UPDATES = timedelta(days=365)
+#MIN_TIME_BETWEEN_UPDATES = timedelta(days=365)
 # Every 6 hours seems appropriate to get an update ready in the morning
-#MIN_TIME_BETWEEN_UPDATES = timedelta(hours=6)
+# This number is adjusted dynamically after first fetch to only update every 24 hours when using selenium login.
+MIN_TIME_BETWEEN_UPDATES = timedelta(hours=6)
 # Smallest appropriate interval.  Only relevant for development use.
 #MIN_TIME_BETWEEN_UPDATES = timedelta(minutes=15)
 
