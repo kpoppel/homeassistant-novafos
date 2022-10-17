@@ -15,17 +15,6 @@ import random
 import base64
 import uuid
 
-# Automate recaptcha
-from seleniumwire import webdriver
-
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.firefox.options import Options
-import time
-
-
 _LOGGER = logging.getLogger(__name__)
 
 class LoginFailed(Exception):
