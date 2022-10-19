@@ -4,12 +4,41 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 #from selenium.webdriver.firefox.options import Options
-#import requests
-#import json
 import time
 import random
-from flask import Flask, request
+from flask import Flask, request, make_response
 from flask_restful import Resource, Api
+import base64
+import jinja2
+
+def convert_img_to_stream(img_local_path):
+  """ Base64 encode an image"""
+  import base64
+  img_stream = ''
+  with open(img_local_path, 'rb') as img_f:
+      img_stream = img_f.read()
+      img_stream = base64.b64encode(img_stream).decode()
+  return img_stream
+
+def return_images_as_stream(filenames):
+  """ Takes a list of paths to images and returns a HTML string with bse64 encoded images."""
+  images = []
+  for img_path in filenames:
+    img_stream = convert_img_to_stream(img_path)
+    images.append(img_stream)
+
+  doc= """
+        <!DOCTYPE html><html><body>
+        {% for img in images %}
+          <img src="data:image/jpeg;base64, {{ img }}">
+        {% endfor %}
+        </body></html>
+        """    
+  template = jinja2.Template(doc)
+  resp = make_response(template.render(images=images))
+  resp.headers.set('content-type', 'text/html; charset=utf-8')
+  # Ready for returning to caller
+  return resp
 
 #Firefox - but was very slow!
 #options = Options()
@@ -23,9 +52,12 @@ spath="/home/seluser/"
 
 ## Setup the Flask endpoint(s)
 class NovafosTokenAPI(Resource):
-  def get(self):
-    """ TODO: Add a little staus here on server status and maybe other things."""
-    pass
+  def get(self, func = None):
+    if func == "screenshots":
+      filenames = ['screen_login.png', 'screen_login_filled.png', 'screen_login_final.png']
+      return return_images_as_stream(filenames)
+    else:
+      return { "message": "Server is up at /novafos-token/.  If you need to see screenshots access /novafos-token/screenshots"}
 
   def post(self):
     # Requirement: Header: Content-Type:application/json
@@ -60,7 +92,6 @@ class NovafosTokenAPI(Resource):
         'id_token': ''
       }
     #driver = webdriver.Firefox(options=options, executable_path=executable_path)
-    #login_url = "https://duckduckgo.com"
     driver = webdriver.Chrome(chrome_options=options)
     login = driver.get(login_url)
     if screenshot:
@@ -71,6 +102,8 @@ class NovafosTokenAPI(Resource):
           EC.presence_of_element_located((By.ID, "collapseUserPassword"))
         )
     except:
+      print("Timeout waiting for the login screen. Screenshots available at /novafos-token/screenshots")
+      driver.get_screenshot_as_file(spath+"screen_login.png")
       driver.quit()
       return dummy_token
 
@@ -84,8 +117,6 @@ class NovafosTokenAPI(Resource):
     if screenshot:
       driver.get_screenshot_as_file(spath+"screen_login_filled.png")
 
-    # Simulate a person taking some time to hit Enter.
-    # Maybe some mouse jiggling is needed too.
     time.sleep(round(random.uniform(3.14, 6.42),2))
     #input("Press ENTER once you are finished")
     elm_pass.send_keys(Keys.ENTER)
@@ -97,13 +128,15 @@ class NovafosTokenAPI(Resource):
       if screenshot:
         driver.get_screenshot_as_file(spath+"screen_final.png")
     except:
+      print("Timeout waiting for the final screen. Screenshots available at /novafos-token/screenshots")
+      driver.get_screenshot_as_file(spath+"screen_final.png")
       driver.quit()
       return dummy_token
 
     _token = ""
     for req in driver.requests:
       # Locate https://easy-energy-identity.kmd.dk/oidc/token in network traffic
-      if "/oidc/token" in  req.url: # and request.method == 'POST' and request.response.status_code == 200:
+      if "/oidc/token" in  req.url: # and request.methiod == 'POST' and request.response.status_code == 200:
         # Byte stream
         print("Token retrieved:\n")
         print(req.response.body)
@@ -113,14 +146,25 @@ class NovafosTokenAPI(Resource):
     if _token == "":
       return dummy_token
 
-    # String returned
+    # Byte stream returned
     return _token
 
 class NovafosTokenAPITest(Resource):
   """ Test endpoint to be used with pynovafos """
-  def get(self):
-    """ TODO: Add a little staus here on server status and maybe other things."""
-    return { 'message': 'TEST MODE' }
+  def get(self, func = None):
+    if func == "screenshots":
+      driver = webdriver.Chrome(chrome_options=options)
+      login_url = "https://duckduckgo.com"
+      login = driver.get(login_url)
+      driver.get_screenshot_as_file(spath+"screen_login.png")
+      driver.get_screenshot_as_file(spath+"screen_login_filled.png")
+      driver.get_screenshot_as_file(spath+"screen_login_final.png")
+      driver.quit()
+
+      filenames = ['screen_login.png', 'screen_login_filled.png', 'screen_login_final.png']
+      return return_images_as_stream(filenames)
+    else:
+      return { "message": "Server is up at /novafos-token-test/"}
 
   def post(self):
     return {
@@ -137,8 +181,8 @@ class NovafosTokenAPITest(Resource):
 app = Flask(__name__)
 api = Api(app)
 ## Add endpoints
-api.add_resource(NovafosTokenAPI, '/novafos-token/')
-api.add_resource(NovafosTokenAPITest, '/novafos-token-test/')
+api.add_resource(NovafosTokenAPI, '/novafos-token/', '/novafos-token/<string:func>')
+api.add_resource(NovafosTokenAPITest, '/novafos-token-test/', '/novafos-token-test/<string:func>')
 
 # Run the service on port 5000, listening to all interfaces
 if __name__ == "__main__":

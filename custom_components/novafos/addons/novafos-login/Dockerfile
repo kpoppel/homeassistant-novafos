@@ -1,3 +1,6 @@
+#ARG BUILD_FROM
+#FROM $BUILD_FROM
+
 #FROM selenium/standalone-firefox:4.5.0
 FROM selenium/standalone-chrome:4.5.0
 
