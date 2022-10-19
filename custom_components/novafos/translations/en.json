@@ -12,9 +12,17 @@
             "user": {
                 "data": {
                     "supplierid": "Supplier ID",
+                    "login_method": "Login method",
+                    "name": "Sensor Name Prefix"
+                    }
+            },
+            "step_2": {
+                "data": {
                     "password": "Password",
                     "username": "Username",
-                    "name": "Sensor Name Prefix"
+                    "access_token": "Insert a working access token",
+                    "access_token_date_updated": "Do not change this field. Autofilled date/time of updating the token.",
+                    "container_url": "URL to the novafos-login docker container"
                 }
             }
         }
@@ -23,8 +31,11 @@
         "step": {
             "init": {
                 "data": {
-                "access_token": "Insert a working access token",
-                "access_token_date_updated": "Do not change this field. Autofilled date/time of updating the token."
+                    "password": "Password",
+                    "username": "Username",
+                    "access_token": "Insert a working access token",
+                    "access_token_date_updated": "Do not change this field. Autofilled date/time of updating the token.",
+                    "container_url": "URL to the novafos-login docker container"
                 }
             }
         }

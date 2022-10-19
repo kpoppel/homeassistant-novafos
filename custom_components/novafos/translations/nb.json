@@ -12,11 +12,32 @@
             "user": {
                 "data": {
                     "supplierid": "Leverandør ID",
+                    "login_method": "Loginmetode",
+                    "name": "Sensornavn Præfix"
+                    }
+            },
+            "step_2": {
+                "data": {
                     "password": "Kodeord",
                     "username": "Brugernavn",
-                    "name": "Sensornavn Præfix"
+                    "access_token": "Indsæt et nyt adgangstoken",
+                    "access_token_date_updated": "Ret ikke i dette felt.  Det er automatisk udfyldt med tidspunktet for opdatering af token.",
+                    "container_url": "URL til novafos-login container"
                 }
             }
         }
-    }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "data": {
+                    "password": "Kodeord",
+                    "username": "Brugernavn",
+                    "access_token": "Indsæt et nyt adgangstoken",
+                    "access_token_date_updated": "Ret ikke i dette felt.  Det er automatisk udfyldt med tidspunktet for opdatering af token.",
+                    "container_url": "URL til novafos-login container"
+                }
+            }
+        }
+    }    
 }

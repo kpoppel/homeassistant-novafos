@@ -62,13 +62,17 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
         selenium_host_url  = f"http://localhost:5000/novafos-token"
 
         try:
-            # NOTE: Re-enable if login screen reCAPTCHA is removed:
-            # if not await self.hass.async_add_executor_job(self.api.authenticate):
-            # for now use this line:
-            #if not await self.hass.async_add_executor_job(self.api.authenticate_using_access_token, self.entry.options['access_token'], self.entry.options['access_token_date_updated']):
-            # for selenium based authentification use this line:
-            if not await self.hass.async_add_executor_job(self.api.authenticate_using_selenium, selenium_host_url):
-                raise InvalidAuth
+            # Let us use one of the three types of login - as far as we know, only token based and experimental selenium
+            # login works.
+            if self.entry.data['login_method'] == "Token based":
+               if not await self.hass.async_add_executor_job(self.api.authenticate_using_access_token, self.entry.options['access_token'], self.entry.options['access_token_date_updated']):
+                    raise InvalidAuth
+            elif  self.entry.data['login_method'] == "Username/password":
+                if not await self.hass.async_add_executor_job(self.api.authenticate):
+                    raise InvalidAuth
+            else:
+                if not await self.hass.async_add_executor_job(self.api.authenticate_using_selenium, self.entry.options['container_url']):
+                    raise InvalidAuth
         except InvalidAuth as error:
             raise ConfigEntryAuthFailed from error
 
