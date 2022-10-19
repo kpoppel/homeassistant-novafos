@@ -53,14 +53,6 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
         #    self.update_interval = timedelta(seconds=randrange(20))
         _LOGGER.debug(f"Next update at: {now +  self.update_interval}")
 
-        ######
-        ## TODO: Preliminary placement - need to be an option
-        ## NOTE: You can try this out and help out on github.  This is an early "expert" version
-        ## Change localhost to the ip-address of your docker container host.
-        ######
-        #selenium_host_url = f"http://localhost:5000/novafos-token-test"
-        selenium_host_url  = f"http://localhost:5000/novafos-token"
-
         try:
             # Let us use one of the three types of login - as far as we know, only token based and experimental selenium
             # login works.
