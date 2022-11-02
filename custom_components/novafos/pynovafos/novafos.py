@@ -548,12 +548,8 @@ class Novafos:
 
                 #_LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
         for key, series_type in self._meter_data.items():
-            _LOGGER.debug("Series is now:")
-            self._print_json(series_type)
             if 'hour' in series_type:
                 for hour_data in series_type['hour']['Data']:
-                    _LOGGER.debug("Hourly data is now:")
-                    self._print_json(series)
                     _LOGGER.debug(f"{hour_data['DateFrom']} - {hour_data['DateTo']} - {hour_data['Value']}")
                 _LOGGER.debug(f"Total/Avg/Min/Max: {series_type['hour']['Total']['Value']} / {series_type['hour']['Average']['Value']} / {series_type['hour']['Minimum']['Value']} / {series_type['hour']['Maximum']['Value']}")
             #else:
