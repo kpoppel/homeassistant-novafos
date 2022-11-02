@@ -95,7 +95,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_step_2(self, user_input: Optional[Dict[str, Any]] = None) -> FlowResult:
         """Handle options during setup. These functions are called at least twice.
-           First round hasuser_Data = None, and shows the form.  Then it is called again with user_data set.
+           First round has user_input = None, and shows the form.  Then it is called again with user_input set.
         """
         if user_input is not None:
             # Validate - not implemented

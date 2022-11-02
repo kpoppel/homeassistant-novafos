@@ -37,9 +37,9 @@ async def update_listener(hass: HomeAssistant, entry: ConfigEntry):
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Novafos from a config entry."""
-    username = entry.options['username'] or None
-    password = entry.options['password'] or None
-    supplierid = entry.data['supplierid'] or None
+    username = entry.options.get('username')
+    password = entry.options.get('password')
+    supplierid = entry.data.get('supplierid')
     
     _LOGGER.debug(f"Novafos ConfigData: {entry.data}")
 

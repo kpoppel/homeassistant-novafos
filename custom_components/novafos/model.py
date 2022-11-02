@@ -23,5 +23,6 @@ class NovafosSensorDescription(SensorEntityDescription):
       And our own if we so like:
         my_parameter: str | None = None
     """
+    sensor_type: str | None = None
 
 

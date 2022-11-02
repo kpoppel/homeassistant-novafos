@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import Final
 from datetime import timedelta
-from homeassistant.const import (VOLUME_CUBIC_METERS, DEVICE_CLASS_GAS, DEVICE_CLASS_DATE)
+from homeassistant.const import (VOLUME_CUBIC_METERS, ENERGY_KILO_WATT_HOUR, DEVICE_CLASS_GAS, DEVICE_CLASS_DATE, DEVICE_CLASS_ENERGY)
 from homeassistant.components.sensor import STATE_CLASS_MEASUREMENT
 
 from .model import NovafosSensorDescription
@@ -40,8 +40,9 @@ MIN_TIME_BETWEEN_UPDATES = timedelta(hours=6)
 # *  Day Total for "last valid" -  attribute stating last valid data date
 # *  Make an hourly "last valid" sensor which returns the data from the correct hour some days ago.
 #    This should be for those not setting up Apexchards using the attributes.
-SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
+WATER_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
     NovafosSensorDescription(
+        sensor_type = "water",
         key = "year",
         name = "Year Total",
         entity_registry_enabled_default = True,
@@ -51,6 +52,7 @@ SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
         state_class = STATE_CLASS_MEASUREMENT
     ),
     NovafosSensorDescription(
+        sensor_type = "water",
         key = "month",
         name = "Month Total",
         entity_registry_enabled_default=True,
@@ -60,6 +62,7 @@ SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
         state_class = STATE_CLASS_MEASUREMENT
     ),
     NovafosSensorDescription(
+        sensor_type = "water",
         key = "day",
         name = "Day Total",
         entity_registry_enabled_default=True,
@@ -69,6 +72,7 @@ SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
         state_class = STATE_CLASS_MEASUREMENT
     ),
     NovafosSensorDescription(
+        sensor_type = "water",
         key = "hour",
         name = "Hour",
         entity_registry_enabled_default=True,
@@ -78,8 +82,62 @@ SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
         state_class = STATE_CLASS_MEASUREMENT
     ),
     NovafosSensorDescription(
+        sensor_type = "water",
         key = "valid_date",
         name = "Valid Date for data",
+        entity_registry_enabled_default=True,
+        native_unit_of_measurement = None,
+        device_class = DEVICE_CLASS_DATE,
+        icon = "mdi:calendar",
+        state_class = STATE_CLASS_MEASUREMENT
+    )
+)
+
+HEATING_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
+    NovafosSensorDescription(
+        sensor_type = "heating",
+        key = "year",
+        name = "Heating Year Total",
+        entity_registry_enabled_default = True,
+        native_unit_of_measurement = ENERGY_KILO_WATT_HOUR,
+        device_class = DEVICE_CLASS_ENERGY,
+        icon = "mdi:lightning-bolt-circle",
+        state_class = STATE_CLASS_MEASUREMENT
+    ),
+    NovafosSensorDescription(
+        sensor_type = "heating",
+        key = "month",
+        name = "Heating Month Total",
+        entity_registry_enabled_default=True,
+        native_unit_of_measurement = ENERGY_KILO_WATT_HOUR,
+        device_class = DEVICE_CLASS_ENERGY,
+        icon = "mdi:lightning-bolt-circle",
+        state_class = STATE_CLASS_MEASUREMENT
+    ),
+    NovafosSensorDescription(
+        sensor_type = "heating",
+        key = "day",
+        name = "Heating Day Total",
+        entity_registry_enabled_default=True,
+        native_unit_of_measurement = ENERGY_KILO_WATT_HOUR,
+        device_class = DEVICE_CLASS_ENERGY,
+        icon = "mdi:lightning-bolt-circle",
+        state_class = STATE_CLASS_MEASUREMENT
+    ),
+    NovafosSensorDescription(
+        sensor_type = "heating",
+        key = "hour",
+        name = "Heating Hour",
+        entity_registry_enabled_default=True,
+        native_unit_of_measurement = ENERGY_KILO_WATT_HOUR,
+        device_class = DEVICE_CLASS_GAS,
+        icon = "mdi:lightning-bolt-circle",
+        state_class = STATE_CLASS_MEASUREMENT
+    ),
+    NovafosSensorDescription(
+        sensor_type = "heating",
+        key = "valid_date",
+        name = "Heating_Valid Date for data",
         entity_registry_enabled_default=True,
         native_unit_of_measurement = None,
         device_class = DEVICE_CLASS_DATE,

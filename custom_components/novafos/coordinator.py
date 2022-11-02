@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from custom_components.novafos.pynovafos.novafos import Novafos
-from .sensor import NovafosWaterSensor
+#from .sensor import NovafosWaterSensor
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -48,7 +48,7 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
         """
         now = dt.now()
         self.update_interval = (now.replace(hour=2, minute=0, second=0) - now) + timedelta(hours=24, minutes=randrange(5*60))
-        # Test shorter update interfal - no this ONLY with the test endpoint!!!
+        # Test shorter update interval - no this ONLY with the test endpoint!!!
         #  Also make sure to not poll data from KMD as you may get flagged for abuse.
         #    self.update_interval = timedelta(seconds=randrange(20))
         _LOGGER.debug(f"Next update at: {now +  self.update_interval}")
