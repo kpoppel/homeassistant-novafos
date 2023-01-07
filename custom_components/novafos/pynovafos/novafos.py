@@ -35,6 +35,7 @@ class Novafos:
 
         self._access_token = ""
         self._customer_id = ""
+        self._customer_number = ""
         self._active_meters = []
         self._meter_data = {}
         self._last_valid_day = None
@@ -55,7 +56,7 @@ class Novafos:
         }
 
     def _print_json(self, map):
-        print(json.dumps(map, indent=4, sort_keys=True, ensure_ascii=False))
+        _LOGGER.debug(json.dumps(map, indent=4, sort_keys=True, ensure_ascii=False))
 
     def _generate_random_string(self, size):
         rand = random.SystemRandom()
@@ -231,7 +232,8 @@ class Novafos:
         response = requests.get(url, headers=headers)        
         #self._print_json(response.json())
         self._customer_id = f"{response.json()['Customers'][0]['Id']}"
-        _LOGGER.debug("Retrieved customer_id: %s", self._customer_id)
+        self._customer_number = f"{response.json()['Customers'][0]['Number']}"
+        _LOGGER.debug("Retrieved customer_id, number: %s, %s", self._customer_id, self._customer_number)
 
     def _get_active_meters(self):
         """
@@ -261,6 +263,7 @@ class Novafos:
         """
         headers = {
             'Customer-Id': self._customer_id,
+            'Customer-Number': self._customer_number,
             "Authorization" : self._access_token
         }
 
@@ -271,6 +274,8 @@ class Novafos:
         url = f"{self._api_url}/api/meter/customerActiveMeters"
 
         response = requests.post(url, data=data, headers=headers)
+        # NOTE: Failure may happen right here whenever the API is updated with new headers and what not.
+        #_LOGGER.debug(response.text)
 
         #self._print_json(response.json())
         response_json = response.json()
@@ -378,6 +383,7 @@ class Novafos:
         """
         headers = {
             'Customer-Id': self._customer_id,
+            'Customer-Number': self._customer_number,
             "Authorization" : self._access_token
         }
 

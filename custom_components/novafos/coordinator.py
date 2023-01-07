@@ -57,12 +57,15 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
             # Let us use one of the three types of login - as far as we know, only token based and experimental selenium
             # login works.
             if self.entry.data['login_method'] == "Token based":
-               if not await self.hass.async_add_executor_job(self.api.authenticate_using_access_token, self.entry.options['access_token'], self.entry.options['access_token_date_updated']):
+                _LOGGER.debug(f"Performing token based authentication")
+                if not await self.hass.async_add_executor_job(self.api.authenticate_using_access_token, self.entry.options['access_token'], self.entry.options['access_token_date_updated']):
                     raise InvalidAuth
             elif  self.entry.data['login_method'] == "Username/password":
+                _LOGGER.debug(f"Performing user/password based authentication")
                 if not await self.hass.async_add_executor_job(self.api.authenticate):
                     raise InvalidAuth
             else:
+                _LOGGER.debug(f"Performing automated authentication (subject to reCAPTCHA tripwires)")
                 if not await self.hass.async_add_executor_job(self.api.authenticate_using_selenium, self.entry.options['container_url']):
                     raise InvalidAuth
         except InvalidAuth as error:
