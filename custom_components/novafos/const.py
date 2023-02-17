@@ -72,7 +72,7 @@ WATER_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
         native_unit_of_measurement = UnitOfVolume.CUBIC_METERS,
         device_class = SensorDeviceClass.WATER,
         icon = "mdi:water",
-        state_class = SensorStateClass.MEASUREMENT
+        state_class = None
     ),
     NovafosSensorDescription(
         sensor_type = "water",
@@ -82,7 +82,7 @@ WATER_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
         native_unit_of_measurement = UnitOfVolume.CUBIC_METERS,
         device_class = SensorDeviceClass.WATER,
         icon = "mdi:water",
-        state_class = SensorStateClass.MEASUREMENT
+        state_class = None
     ),
     NovafosSensorDescription(
         sensor_type = "water",
@@ -125,7 +125,7 @@ HEATING_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
         native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR,
         device_class = SensorDeviceClass.ENERGY,
         icon = "mdi:lightning-bolt-circle",
-        state_class = SensorStateClass.MEASUREMENT
+        state_class = None
     ),
     NovafosSensorDescription(
         sensor_type = "heating",
@@ -135,7 +135,7 @@ HEATING_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
         native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR,
         device_class = SensorDeviceClass.ENERGY,
         icon = "mdi:lightning-bolt-circle",
-        state_class = SensorStateClass.MEASUREMENT
+        state_class = None
     ),
     NovafosSensorDescription(
         sensor_type = "heating",
