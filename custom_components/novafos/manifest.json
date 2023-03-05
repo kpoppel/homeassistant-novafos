@@ -1,17 +1,17 @@
 {
   "domain": "novafos",
   "name": "Novafos",
-  "version": "4.0.0",
-  "config_flow": true,
-  "documentation": "https://github.com/kpoppel/homeassistant-novafos",
-  "issue_tracker": "https://github.com/kpoppel/homeassistant-novafos/issues",
-  "requirements": [],
-  "ssdp": [],
-  "zeroconf": [],
-  "homekit": {},
-  "dependencies": [],
   "codeowners": [
     "@kpoppel"
   ],
-  "iot_class": "cloud_polling"
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/kpoppel/homeassistant-novafos",
+  "homekit": {},
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/kpoppel/homeassistant-novafos/issues",
+  "requirements": [],
+  "ssdp": [],
+  "version": "4.0.0",
+  "zeroconf": []
 }
