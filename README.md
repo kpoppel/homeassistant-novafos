@@ -29,22 +29,37 @@ Fully configurable through config flow.
   3. Enter email address and pasword as registered with Novafos.
      If you haven't done this before you need to login using NemId/MitId and
      setup email and password first.
-  4. Enter the supplier ID as well.  Until a better way to get this automatically is identified, you can get the value from inspecting the browser network traffic. See the next section.<br>
+  4. Enter the supplier ID as well.  Until a better way to get this automatically is identified, you can get the value from the next section.<br>
 
 ### Get the supplier id
+
+| Municipality  | supplier id |
+|---------------|-------------|
+| Allerød       | 0642000     |
+| Ballerup      | 0618000     |
+| Egedal        | 0378000     |
+| Furesø        | 0378000     |
+| Frederikssund | 0642000     |
+| Gentofte      | 0676000     |
+| Gladsaxe      | 0676000     |
+| Hørsholm      | 0398000     |
+| Rudersdal     | 0642000     |
+
+If your municipality isn't listed above, try one of these methods:
 
 #### Method 1.
 
 In chrome press F12, and select the "Network" tab.
 Login on the https://minforsyning-2.kmd.dk webpage.
-Inspect the first few entries. You should see something along the lines of: https://<6-digit number>.webtools.kmd.dk/wts/... The 6 digit number is your supplier ID.
+Inspect the first few entries. You should see something along the lines of: https://<7-digit number>.webtools.kmd.dk/wts/... The 7 digit number is your supplier ID.
+
 #### Method 2.
 
 In chrome press F12, and select the "Network" tab.
 Login on https://novafos.dk/selvbetjening/mit-forbrug using the "Klik her og login" button
 Login using nemID, and look for the request "ExternalLogin?returnUrl...."
-Inspect the "Headers" tab and under "General" -> "Request URL" you should see a parameter in the URL "...utility=<6-digit number>&...."
-The 6 digit number is your supplier ID
+Inspect the "Headers" tab and under "General" -> "Request URL" you should see a parameter in the URL "...utility=<7-digit number>&...."
+The 7 digit number is your supplier ID
 
 ---
 # Notice on integration status and ways to login
