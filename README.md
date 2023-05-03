@@ -33,11 +33,26 @@ Fully configurable through config flow.
 
 ### Get the supplier id
 
+| Municipality  | supplier id |
+|---------------|-------------|
+| Allerød       | 0642000     |
+| Ballerup      | 0618000     |
+| Egedal        | 0378000     |
+| Furesø        | 0378000     |
+| Frederikssund | 0642000     |
+| Gentofte      | 0676000     |
+| Gladsaxe      | 0676000     |
+| Hørsholm      | 0398000     |
+| Rudersdal     | 0642000     |
+
+If your municipality isn't listed above, try one of these methods:
+
 #### Method 1.
 
 In chrome press F12, and select the "Network" tab.
 Login on the https://minforsyning-2.kmd.dk webpage.
 Inspect the first few entries. You should see something along the lines of: https://<6-digit number>.webtools.kmd.dk/wts/... The 6 digit number is your supplier ID.
+
 #### Method 2.
 
 In chrome press F12, and select the "Network" tab.
