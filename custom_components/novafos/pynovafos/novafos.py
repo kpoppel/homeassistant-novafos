@@ -31,7 +31,7 @@ class Novafos:
         self._username = username
         self._password = password
         self._supplierid = supplierid
-        self._api_url = "https://minforsyningplugin2webapi.kmd.dk"
+        self._api_url = "https://easy-energy-plugin-api.kmd.dk"
 
         self._access_token = ""
         self._customer_id = ""
