@@ -77,7 +77,7 @@ Until KMD Easy-energy agrees to provide open access to your own data, the integr
 
 ## Method 1: Login on website and copy token to Home Assistant
 
-This first method is 100% manual, but will ensure you get data into Home Assistant regardless.  Why would you do this then?  Well I cannot say, but maybe doing this once per week or month is a good way to keep tabs on consumption or dripping faucets along with all yout other precious data.
+This first method is 100% manual, but will ensure you get data into Home Assistant regardless.  Why would you do this then?  Well I cannot say, but maybe doing this once per week or month is a good way to keep tabs on consumption or dripping faucets along with all your other precious data.
 
 This is how the manual method works:
 
