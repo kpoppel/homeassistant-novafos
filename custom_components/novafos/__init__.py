@@ -1,6 +1,7 @@
 """The novafos integration."""
 from __future__ import annotations
 from custom_components.novafos.coordinator import NovafosUpdateCoordinator
+from custom_components.novafos.services import async_setup_services
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -64,6 +65,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(entry.add_update_listener(update_listener))
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    await async_setup_services(hass, coordinator)
+
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

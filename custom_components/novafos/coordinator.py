@@ -32,6 +32,10 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
         self.hass = hass
         self.entry = entry
         self.supplierid = entry.data['supplierid']
+        # Need local version here to enable updating vis action service calls
+        self.access_token = self.entry.options['access_token']
+        self.access_token_date_updated = self.entry.options['access_token_date_updated']
+        
         # Set last time we updated to right now.
         self.last_update = dt.now()
         
@@ -45,20 +49,26 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         """Get the data for Novafos.
            Manipulate self.update_interval so that updates are happening randomly from 02:00 to 07:00 once per day.
+           Update intervals are only relevant if the login is user/email or automated - which does not work due
+           to login ReCAPTCHA and so on at the moment.
         """
-        now = dt.now()
-        self.update_interval = (now.replace(hour=2, minute=0, second=0) - now) + timedelta(hours=24, minutes=randrange(5*60))
-        # Test shorter update interval - no this ONLY with the test endpoint!!!
-        #  Also make sure to not poll data from KMD as you may get flagged for abuse.
-        #    self.update_interval = timedelta(seconds=randrange(20))
-        _LOGGER.debug(f"Next update at: {now +  self.update_interval}")
+        if self.entry.data['login_method'] == "Token based":
+            self.update_interval = None
+            _LOGGER.debug(f"Token based login used, so no automatic updates scheduled.")
+        else:
+            now = dt.now()
+            self.update_interval = (now.replace(hour=2, minute=0, second=0) - now) + timedelta(hours=24, minutes=randrange(5*60))
+            # Test shorter update interval - no this ONLY with the test endpoint!!!
+            #  Also make sure to not poll data from KMD as you may get flagged for abuse.
+            #    self.update_interval = timedelta(seconds=randrange(20))
+            _LOGGER.debug(f"Next update at: {now +  self.update_interval}")
 
         try:
             # Let us use one of the three types of login - as far as we know, only token based and experimental selenium
             # login works.
             if self.entry.data['login_method'] == "Token based":
                 _LOGGER.debug(f"Performing token based authentication")
-                if not await self.hass.async_add_executor_job(self.api.authenticate_using_access_token, self.entry.options['access_token'], self.entry.options['access_token_date_updated']):
+                if not await self.hass.async_add_executor_job(self.api.authenticate_using_access_token, self.access_token, self.access_token_date_updated):
                     raise InvalidAuth
             elif  self.entry.data['login_method'] == "Username/password":
                 _LOGGER.debug(f"Performing user/password based authentication")
@@ -80,6 +90,6 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
         # Return the data
         # The data is stored in the coordinator as a .data field.
         return data
-
+    
 class InvalidAuth(HomeAssistantError):
     """Error to indicate there is invalid auth."""

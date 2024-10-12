@@ -111,8 +111,8 @@ class Novafos:
         else:
             self._access_token = ""
             _LOGGER.error(f"Token update does not seem to have a valid length. Please check again. (This message is normal the first time the integration starts)")
+            return False
         _LOGGER.debug("Access token set to: '%s' at date: '%s'", self._access_token, self._access_token_date_updated)
-
         return True
 
     def authenticate(self):
@@ -567,7 +567,7 @@ class Novafos:
         now = datetime.now()
         # Allow 45 minutes since the last token update.  If updating after this point, return dummy data.
         if self._access_token == "" or datetime.strptime(self._access_token_date_updated, '%Y-%m-%dT%H:%M:%S') + timedelta(minutes=45) < now:
-            _LOGGER.debug("access_token too old or not set correctly:")
+            _LOGGER.debug("Access_token too old or not set correctly:")
             dateTo =  now.strftime("%Y-%m-%dT%H:%M:%S+00:00")
             dateTwo =  now.strftime("%Y-%m-%dT%H:%M:%S")
             return {

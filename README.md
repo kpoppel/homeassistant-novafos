@@ -100,7 +100,12 @@ This is how the manual method works:
 1. Data is fetched as usual.
 1. Repeat as often as you like - you are using a token generated from a human interaction, satisfying the login process.
 
-## Method 2: Using Selenium web-driver (advanced)
+## Method 2: Using Chrome add-on (medium advanced, recommended).
+
+Install the Chrome extension in the addons/ha-novafos-token folder.  See the README file in the addons directory for the details.  The extension automates scraping the token and sendign it to Home Assistant.
+Note you have to setup Home Assistant to be accessed through HTTPS.
+
+## Method 3: Using Selenium web-driver (advanced, experimental and not recommended)
 
 If you try this method, please bear in mind it is an attempt to automate that which cannot be automated.  Also accept that this is targeted at how the Novafos login page looks like and may need modifications for other suppliers' login screens.  Lastly, I cannot support you if it does not work, you need to debug and help out with more endpoints which looks differently.
 

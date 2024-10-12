@@ -6,7 +6,8 @@ from typing import Any, Dict, Optional
 import voluptuous as vol
 
 from homeassistant.core import callback
-from homeassistant import config_entries
+#from homeassistant import config_entries
+from homeassistant.config_entries import SOURCE_REAUTH, ConfigEntry, OptionsFlow, ConfigFlow
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
@@ -44,7 +45,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     # title becomes the title on the integrations screen in the UI
     return {"title": f"Novafos {data['supplierid']}"}
 
-class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class ConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for novafos."""
 
     VERSION = 3
@@ -156,10 +157,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Get the options flow for this handler."""
         return OptionsFlowHandler(config_entry)
 
-class OptionsFlowHandler(config_entries.OptionsFlow):
+class OptionsFlowHandler(OptionsFlow):
     """Handle an option flow.  This is the flow when reconfiguring after adding the integration"""
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+    def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize options flow."""
         self.config_entry = config_entry
 
