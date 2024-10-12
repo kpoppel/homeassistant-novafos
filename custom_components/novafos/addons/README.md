@@ -7,12 +7,19 @@ You can inspect the code (why it is unpacked) to verify it does not transmit you
 
 The add-on is a brutally made fork of the "token-inspector" addon available on the chrome shop.  Thank-you go to the originator which made it much easier to get this project moving.
 
-** Requirements **
+### Requirements
 
 Chrome or extension compatible browser.  Access to Home Assistant via HTTPS.  If you don't know how to serve HA through HTTPS, look for help on the forums.  Some use apache, nginx, caddy, Traefik, NabuCasa.
 there is a thread here which may help too: [https://community.home-assistant.io/t/connecting-to-ha-locally-using-https/566441/50](https://community.home-assistant.io/t/connecting-to-ha-locally-using-https/566441/50)
 
-**Install as follows**
+### Daily use the add-on
+
+1. Browse to https://novafos.dk and login as you normally would.  I strongly recommend using a password manager like Bitwarden to login faster.
+2. Press F12 and find the tab with the add-on
+3. Refresh the page (CTRL-R) and your token should appear.
+4. Press the button to send an action-service call to Home Assistant.
+
+### Install as follows
 
 1. Copy the directory `ha-novafos-token` to your PC.
 2. Open Chrome extensions `chrome://extensions/`
@@ -20,19 +27,19 @@ there is a thread here which may help too: [https://community.home-assistant.io/
 4. Press "load unpacked"/"indlæs upakket" and browser to the directory `ha-novafos-token`.  Press the okay button.
 5. The extension now loads into the browser.
 
-**Setup the add-on (one-time)**
+### Setup the add-on (one-time)
 
-1. Enter your https URL for your home assistant installation.  NOTE: If you are not accessing HA using https, this add-on will not work because calling http URLs from secure places is never ever a good idea, and Chrome blocks it.
-2. Press F12 and find the tab with the extension.
-3. Setup the URL to your HA installation using HTTPS
+1. In Home Assistant go to https://homeassistant.local/profile/security, find the long lived token section and create a new token.  you can call it "novafos-chrome" or whatever you like.  Save the value, you will only see it once.
+1. Press F12 and find the tab with the extension.
+2. Enter your https URL for your home assistant installation.  NOTE: If you are not accessing HA using https, this add-on will not work because calling http URLs from secure places is never ever a good idea, and Chrome blocks it.
+3. Input your long lived Home Assistant token in the appropriate field.
 
-Use the add-on like so:
+The values are saved in your browser local storage.
 
-1. Browse to https://novafos.dk and login as you normally would.  I strongly recommend using a pasword manager like Bitwarden to login faster.
-2. Press F12 and find the tab with the add-on
-3. Refresh the page (CTRL-R) and your token should appear.
-4. 
+Setup complete.
 
+### Extras
+If you want to play around, you can inspect the scraped token and get a 'curl' command line to copy into a prompt to see what happens.  This is great if you cannot get it to work.
 
 ## novafos-login
 
