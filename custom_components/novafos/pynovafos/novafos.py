@@ -55,8 +55,8 @@ class Novafos:
          "Billing" : 4
         }
 
-    def _print_json(self, map):
-        _LOGGER.debug(json.dumps(map, indent=4, sort_keys=True, ensure_ascii=False))
+    def _print_json(self, map, context="JSON dump"):
+        _LOGGER.debug("%s:\n %s", context, json.dumps(map, indent=4, sort_keys=True, ensure_ascii=False))
 
     def _generate_random_string(self, size):
         rand = random.SystemRandom()
@@ -230,7 +230,7 @@ class Novafos:
         url = f'{self._api_url}/api/profile/get'
 
         response = requests.get(url, headers=headers)        
-        #self._print_json(response.json())
+        #self._print_json(response.json(), "Retrieved customer ID JSON response")
         self._customer_id = f"{response.json()['Customers'][0]['Id']}"
         self._customer_number = f"{response.json()['Customers'][0]['Number']}"
         _LOGGER.debug("Retrieved customer_id, number: %s, %s", self._customer_id, self._customer_number)
@@ -246,7 +246,7 @@ class Novafos:
           'MeasurementPointType': '', 
           'MeasurementPointNumber': '<str>', 
           'MeterId': <int>,
-          'ConsumptionTypeId': 6,          <--- is '6' water?
+          'ConsumptionTypeId': 6,          <--- '6'=water, '5'=heating
           'ConsumptionTypeName': 'Vand',   <--- might want to ensure we are looking at water too
           'IsRemoteRead': True, 
           'IsActive': True,                <--- Check this one for True
@@ -275,9 +275,8 @@ class Novafos:
 
         response = requests.post(url, data=data, headers=headers)
         # NOTE: Failure may happen right here whenever the API is updated with new headers and what not.
-        #_LOGGER.debug(response.text)
+        #self._print_json(response.json(), "Get active meters response")
 
-        #self._print_json(response.json())
         response_json = response.json()
         self._active_meters = []
         for meter in response_json:
@@ -291,6 +290,7 @@ class Novafos:
                     "Unit" : meter["Units"][0],
                 }
                 self._meter_data['water'] = {}
+                self._active_meters.append(active)
             if meter["IsActive"] == True and meter["ConsumptionTypeId"] == 5:
                 # Heating type
                 active = {
@@ -300,11 +300,11 @@ class Novafos:
                     "Unit" : meter["Units"][0],
                 }
                 self._meter_data['heating'] = {}
-            self._active_meters.append(active)
+                self._active_meters.append(active)
         _LOGGER.debug('Got active (water/heating) meters : %s', self._active_meters)
 
-    def _get_consumption_timeseries(self, dateFrom, dateTo, zoomLevel = 0):
-        """Get the timeseries as requested for all meters, based on zoom level and date range.
+    def _get_consumption_timeseries(self, metering_device, dateFrom, dateTo, zoomLevel = 0):
+        """Get the timeseries as requested for a single metering device, based on zoom level and date range.
 
         Zoomlevel:
          0 : Year
@@ -387,63 +387,66 @@ class Novafos:
             "Authorization" : self._access_token
         }
 
+        # Setup query parameters for the API.
+        # Necessary fields are installation relevant properties and the date/zoom range.
+        data = {
+            "InstallationId": metering_device["InstallationId"],
+            "MeasurementPointId": metering_device["MeasurementPointId"],
+            "Unit": metering_device["Unit"],
+            "ZoomLevel": zoomLevel,
+            "PriceData":"false", #optional
+            "DateFrom": dateFrom,
+            "DateTo": dateTo,
+        }
+
+        url = f"{self._api_url}/api/consumption/consumptionTimeSeries"
+
+        response = requests.post(url, json=data, headers=headers)
+        result_json = response.json()
+
+        # Enable logging DEBUG to see all returned data from the API:
+        self._print_json(result_json, "Retrieved timeseries JSON response")
+
+        # Clean data so only valid data is returned and register the valid date
+        series_data = []
+        last_valid_date = ""
+        if result_json["Series"]:
+            for data in result_json["Series"][0]["Data"]:
+                # Only add complete data, unless it is the Year or Month zoom levels
+                if data["IsComplete"] == True or zoomLevel < 2:
+                    series_data.append({
+                        "DateFrom" : data["DateFrom"],
+                        "DateTo" : data["DateTo"],
+                        "Value" : data["Value"]
+                    })
+                    # NOTE: Assuming data is sorted by date - which it is
+                    last_valid_date = data["DateTo"]
+
+        # Return first data series.  Unknown how more series could come from a single metering device?
+        meter_data = {
+            "type" : metering_device['type'],
+            "Data" : series_data,
+            "Total" : result_json["Total"],
+            "Average": result_json["Average"],
+            "Maximum": result_json["Maximum"],
+            "Minimum": result_json["Minimum"],
+            "LastValidDate" : last_valid_date
+            }
+        _LOGGER.debug(f"Retrieved data from API: {meter_data}")
+        return meter_data
+
+    def _get_all_consumption_timeseries(self, dateFrom, dateTo, zoomLevel = 0):
+        """ Retrieve data from all active metering devices """
         meter_data = []
         for active_meter in self._active_meters:
-            # Merge meter data with date range. Commented lines comes from the active_meters dict.
-            # active_meters add the following necessary fields:
-            #  MeasurementPointId, InstallationId, Unit
-            data = {
-                "InstallationId": active_meter["InstallationId"],
-                "MeasurementPointId": active_meter["MeasurementPointId"],
-                "Unit": active_meter["Unit"],
-                "ZoomLevel": zoomLevel,
-                "PriceData":"false", #optional
-                "DateFrom": dateFrom,
-                "DateTo": dateTo,
-            }
-
-            url = f"{self._api_url}/api/consumption/consumptionTimeSeries"
-
-            result = requests.post(url, json=data, headers=headers)
-            result_json = result.json()
-
-            # Enable this to see all returned data from the API:
-            _LOGGER.debug(json.dumps(result_json, sort_keys = False, indent = 4))
-
-            # Clean data so only valid data is returned and register the valid date
-            series_data = []
-            last_valid_date = ""
-            if result_json["Series"]:
-                for data in result_json["Series"][0]["Data"]:
-                    # Only add complete data, unless it is the Year or Month zoom levels
-                    if data["IsComplete"] == True or zoomLevel < 2:
-                        series_data.append({
-                            "DateFrom" : data["DateFrom"],
-                            "DateTo" : data["DateTo"],
-                            "Value" : data["Value"]
-                        })
-                        # NOTE: Assuming data is sorted by date - which it is
-                        last_valid_date = data["DateTo"]
-
-            # Return first data series.  Unknown how more series could come from a single metering device?
-            meter_data.append({
-                "type" : active_meter['type'],
-                "Data" : series_data,
-                "Total" : result_json["Total"],
-                "Average": result_json["Average"],
-                "Maximum": result_json["Maximum"],
-                "Minimum": result_json["Minimum"],
-                "LastValidDate" : last_valid_date
-                })
-
-        _LOGGER.debug(f"Retrieved data from API: {meter_data}")
+            meter_data.append(self._get_consumption_timeseries(active_meter, dateFrom, dateTo, zoomLevel))
         return meter_data
 
     def _get_year_data(self):
         dateFrom = datetime.now().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S.000Z")
         dateTo = datetime.now().replace(month=12, day=31, hour=23, minute=59, second=59, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S.000Z")
         _LOGGER.debug(f"Getting Year data from {dateFrom} to {dateTo}")
-        time_series = self._get_consumption_timeseries(dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level['Year'])
+        time_series = self._get_all_consumption_timeseries(dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level['Year'])
 
         for series in time_series:
             type = series.pop('type')
@@ -468,7 +471,7 @@ class Novafos:
         dateTo = (now.replace(now.year + int(now.month/12), now.month%12+1, 1)-timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
         _LOGGER.debug(f"Getting Month data from {dateFrom} to {dateTo}")
-        time_series = self._get_consumption_timeseries(dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level['Month'])
+        time_series = self._get_all_consumption_timeseries(dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level['Month'])
 
         for series in time_series:
             type = series.pop('type')
@@ -490,7 +493,7 @@ class Novafos:
         dateFrom = now.strftime("%Y-%m-%dT%H:%M:%S.000Z")
         dateTo = (now.replace(now.year + int(now.month/12), now.month%12+1, 1)-timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
         _LOGGER.debug(f"Getting Day data from {dateFrom} to {dateTo}")
-        time_series = self._get_consumption_timeseries(dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level['Day'])
+        time_series = self._get_all_consumption_timeseries(dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level['Day'])
 
         for series in time_series:
             type = series.pop('type')
@@ -525,7 +528,7 @@ class Novafos:
             start_date = datetime.strptime(self._last_valid_day, '%Y-%m-%dT%H:%M:%S%z').replace(hour=0, minute=0, second=0, microsecond=0)
             duration = range(1)
 
-        first_day = True
+        first_day = [True] * len(self._meter_data)
         for day in duration:
             now = (start_date - timedelta(days=day)).replace(hour=0, minute=0, second=0, microsecond=0)
             # I would claim this is a bug in the REST service.  Asking for data for an hour also return the hour after. So we ask for data until 22:59 to
@@ -534,14 +537,14 @@ class Novafos:
             dateTo =  now.replace(hour=22, minute=59, second=59, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S.000Z")
             #dateTo = now.replace(hour=23, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S.000Z")
             _LOGGER.debug(f"Getting Hour data {day} day(s) back in time from {dateFrom} to {dateTo}")
-            time_series = self._get_consumption_timeseries(dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level['Hour'])
+            time_series = self._get_all_consumption_timeseries(dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level['Hour'])
 
-            for series in time_series:
+            for idx, series in enumerate(time_series):
                 type = series.pop('type')
 
-                if first_day:
+                if first_day[idx]:
                     self._meter_data[type]['hour'] = series
-                    first_day = False
+                    first_day[idx] = False
                 elif series['Data']:
                     # If the dataset returned is not empty, move the valid date and mix/max/avg data forward.
                     # That will ensure the dataset reflects the latest values in case they are >24h old
@@ -642,7 +645,7 @@ class Novafos:
         # It seems Novafos has valid data varying from 5 days in the past to yesterday.
         # This one retrieves data from the first day in the month.
         #self._get_hour_data(from_date=datetime.now().replace(day=1))
-        # This one retrieves data 7 days back
+        # This one retrieves data 'days_back' days back
         self._get_hour_data(days_back=1)
 
         # Lastly make an entry for the last valid day in the dataset.  Maybe someone can use this.

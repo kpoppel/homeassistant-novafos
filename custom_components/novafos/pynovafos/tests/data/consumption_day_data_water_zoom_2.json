@@ -1,0 +1,309 @@
+{
+    "SheetName": null,
+    "Series": [
+        {
+            "Data": [
+                {
+                    "DateFrom": "2024-12-01T00:00:00+01:00",
+                    "DateTo": "2024-12-01T23:59:59+01:00",
+                    "Value": 0.291,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-02T00:00:00+01:00",
+                    "DateTo": "2024-12-02T23:59:59+01:00",
+                    "Value": 0.336,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-03T00:00:00+01:00",
+                    "DateTo": "2024-12-03T23:59:59+01:00",
+                    "Value": 0.193,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-04T00:00:00+01:00",
+                    "DateTo": "2024-12-04T23:59:59+01:00",
+                    "Value": 0.445,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-05T00:00:00+01:00",
+                    "DateTo": "2024-12-05T23:59:59+01:00",
+                    "Value": 0.34,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-06T00:00:00+01:00",
+                    "DateTo": "2024-12-06T23:59:59+01:00",
+                    "Value": 0.553,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-07T00:00:00+01:00",
+                    "DateTo": "2024-12-07T23:59:59+01:00",
+                    "Value": 0.323,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-08T00:00:00+01:00",
+                    "DateTo": "2024-12-08T23:59:59+01:00",
+                    "Value": 0.66,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-09T00:00:00+01:00",
+                    "DateTo": "2024-12-09T23:59:59+01:00",
+                    "Value": 0.654,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-10T00:00:00+01:00",
+                    "DateTo": "2024-12-10T23:59:59+01:00",
+                    "Value": 0.316,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-11T00:00:00+01:00",
+                    "DateTo": "2024-12-11T23:59:59+01:00",
+                    "Value": 0.523,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-12T00:00:00+01:00",
+                    "DateTo": "2024-12-12T23:59:59+01:00",
+                    "Value": 0.386,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-13T00:00:00+01:00",
+                    "DateTo": "2024-12-13T23:59:59+01:00",
+                    "Value": 0.418,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-14T00:00:00+01:00",
+                    "DateTo": "2024-12-14T23:59:59+01:00",
+                    "Value": 0.921,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-15T00:00:00+01:00",
+                    "DateTo": "2024-12-15T23:59:59+01:00",
+                    "Value": 0.687,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-16T00:00:00+01:00",
+                    "DateTo": "2024-12-16T23:59:59+01:00",
+                    "Value": 0.38,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-17T00:00:00+01:00",
+                    "DateTo": "2024-12-17T23:59:59+01:00",
+                    "Value": 0.562,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-18T00:00:00+01:00",
+                    "DateTo": "2024-12-18T23:59:59+01:00",
+                    "Value": 0.386,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-19T00:00:00+01:00",
+                    "DateTo": "2024-12-19T23:59:59+01:00",
+                    "Value": 0.261,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-20T00:00:00+01:00",
+                    "DateTo": "2024-12-20T23:59:59+01:00",
+                    "Value": 0.722,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-21T00:00:00+01:00",
+                    "DateTo": "2024-12-21T23:59:59+01:00",
+                    "Value": 0.295,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-22T00:00:00+01:00",
+                    "DateTo": "2024-12-22T23:59:59+01:00",
+                    "Value": 0.35,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-23T00:00:00+01:00",
+                    "DateTo": "2024-12-23T23:59:59+01:00",
+                    "Value": 0.29,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-24T00:00:00+01:00",
+                    "DateTo": "2024-12-24T23:59:59+01:00",
+                    "Value": 0.72,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-25T00:00:00+01:00",
+                    "DateTo": "2024-12-25T23:59:59+01:00",
+                    "Value": 0.416,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-26T00:00:00+01:00",
+                    "DateTo": "2024-12-26T23:59:59+01:00",
+                    "Value": 0.246,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-27T00:00:00+01:00",
+                    "DateTo": "2024-12-27T23:59:59+01:00",
+                    "Value": 0.38,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-28T00:00:00+01:00",
+                    "DateTo": "2024-12-28T23:59:59+01:00",
+                    "Value": 0.347,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-29T00:00:00+01:00",
+                    "DateTo": "2024-12-29T23:59:59+01:00",
+                    "Value": 0.026,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": true,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-30T00:00:00+01:00",
+                    "DateTo": "2024-12-30T23:59:59+01:00",
+                    "Value": 0.017,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": false,
+                    "IsSettlement": false
+                },
+                {
+                    "DateFrom": "2024-12-31T00:00:00+01:00",
+                    "DateTo": "2024-12-31T23:59:59+01:00",
+                    "Value": 0.0,
+                    "UnitName": "m\u00b3",
+                    "Label": "",
+                    "IsComplete": false,
+                    "IsSettlement": false
+                }
+            ],
+            "Label": null
+        }
+    ],
+    "Total": {
+        "Value": 12.444,
+        "DateFrom": "2024-12-01T01:00:00+01:00",
+        "DateTo": "2024-12-31T01:00:00+01:00"
+    },
+    "Average": {
+        "Value": 0.429,
+        "DateFrom": "2024-12-01T00:00:00+01:00",
+        "DateTo": "2024-12-29T23:59:59+01:00"
+    },
+    "Maximum": {
+        "Value": 0.921,
+        "DateFrom": "2024-12-14T00:00:00+01:00",
+        "DateTo": "2024-12-14T23:59:59+01:00"
+    },
+    "Minimum": {
+        "Value": 0.026,
+        "DateFrom": "2024-12-29T00:00:00+01:00",
+        "DateTo": "2024-12-29T23:59:59+01:00"
+    }
+}

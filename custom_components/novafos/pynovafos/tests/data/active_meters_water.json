@@ -1,0 +1,17 @@
+[
+    {
+        "ConsumptionTypeId": 6,
+        "InstallationId": 56781234,
+        "IsActive": true,
+        "MeasurementPointId": 66774455,
+        "Units": [
+            {
+                "Decimals": 0,
+                "Description": "Vand",
+                "Id": 32113,
+                "Name": "m³",
+                "Order": 1
+            }
+        ]
+    }
+]

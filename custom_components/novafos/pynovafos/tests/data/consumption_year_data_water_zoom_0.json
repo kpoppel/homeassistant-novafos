@@ -1,0 +1,39 @@
+{
+    "SheetName": null,
+    "Series": [
+        {
+            "Data": [
+                {
+                    "DateFrom": "2024-01-01T00:00:00",
+                    "DateTo": "2024-12-31T23:59:59",
+                    "Value": 138.6,
+                    "UnitName": "m\u00b3",
+                    "Label": "2024",
+                    "IsComplete": false,
+                    "IsSettlement": false
+                }
+            ],
+            "Label": null
+        }
+    ],
+    "Total": {
+        "Value": 138.6,
+        "DateFrom": "2024-01-01T01:00:00+01:00",
+        "DateTo": "2025-01-01T00:59:59+01:00"
+    },
+    "Average": {
+        "Value": 0.0,
+        "DateFrom": null,
+        "DateTo": null
+    },
+    "Maximum": {
+        "Value": 0.0,
+        "DateFrom": null,
+        "DateTo": null
+    },
+    "Minimum": {
+        "Value": 0.0,
+        "DateFrom": null,
+        "DateTo": null
+    }
+}

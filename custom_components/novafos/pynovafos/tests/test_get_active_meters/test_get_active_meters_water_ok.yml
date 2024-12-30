@@ -1,0 +1,9 @@
+- InstallationId: 12345678
+  MeasurementPointId: 44556677
+  Unit:
+    Decimals: 0
+    Description: Vand
+    Id: 11332
+    Name: m³
+    Order: 1
+  type: water

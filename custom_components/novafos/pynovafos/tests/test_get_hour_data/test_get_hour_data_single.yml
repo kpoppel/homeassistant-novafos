@@ -1,0 +1,92 @@
+water:
+  hour:
+    Average:
+      DateFrom: '2024-12-29T00:00:00'
+      DateTo: '2024-12-29T23:59:59'
+      Value: 0.001
+    Data:
+    - DateFrom: '2024-12-29T00:00:00'
+      DateTo: '2024-12-29T00:59:59'
+      Value: 0.0
+    - DateFrom: '2024-12-29T01:00:00'
+      DateTo: '2024-12-29T01:59:59'
+      Value: 0.0
+    - DateFrom: '2024-12-29T02:00:00'
+      DateTo: '2024-12-29T02:59:59'
+      Value: 0.0
+    - DateFrom: '2024-12-29T03:00:00'
+      DateTo: '2024-12-29T03:59:59'
+      Value: 0.003
+    - DateFrom: '2024-12-29T04:00:00'
+      DateTo: '2024-12-29T04:59:59'
+      Value: 0.0
+    - DateFrom: '2024-12-29T05:00:00'
+      DateTo: '2024-12-29T05:59:59'
+      Value: 0.003
+    - DateFrom: '2024-12-29T06:00:00'
+      DateTo: '2024-12-29T06:59:59'
+      Value: 0.002
+    - DateFrom: '2024-12-29T07:00:00'
+      DateTo: '2024-12-29T07:59:59'
+      Value: 0.001
+    - DateFrom: '2024-12-29T08:00:00'
+      DateTo: '2024-12-29T08:59:59'
+      Value: 0.0
+    - DateFrom: '2024-12-29T09:00:00'
+      DateTo: '2024-12-29T09:59:59'
+      Value: 0.0
+    - DateFrom: '2024-12-29T10:00:00'
+      DateTo: '2024-12-29T10:59:59'
+      Value: 0.0
+    - DateFrom: '2024-12-29T11:00:00'
+      DateTo: '2024-12-29T11:59:59'
+      Value: 0.0
+    - DateFrom: '2024-12-29T12:00:00'
+      DateTo: '2024-12-29T12:59:59'
+      Value: 0.0
+    - DateFrom: '2024-12-29T13:00:00'
+      DateTo: '2024-12-29T13:59:59'
+      Value: 0.0
+    - DateFrom: '2024-12-29T14:00:00'
+      DateTo: '2024-12-29T14:59:59'
+      Value: 0.0
+    - DateFrom: '2024-12-29T15:00:00'
+      DateTo: '2024-12-29T15:59:59'
+      Value: 0.0
+    - DateFrom: '2024-12-29T16:00:00'
+      DateTo: '2024-12-29T16:59:59'
+      Value: 0.0
+    - DateFrom: '2024-12-29T17:00:00'
+      DateTo: '2024-12-29T17:59:59'
+      Value: 0.0
+    - DateFrom: '2024-12-29T18:00:00'
+      DateTo: '2024-12-29T18:59:59'
+      Value: 0.0
+    - DateFrom: '2024-12-29T19:00:00'
+      DateTo: '2024-12-29T19:59:59'
+      Value: 0.0
+    - DateFrom: '2024-12-29T20:00:00'
+      DateTo: '2024-12-29T20:59:59'
+      Value: 0.0
+    - DateFrom: '2024-12-29T21:00:00'
+      DateTo: '2024-12-29T21:59:59'
+      Value: 0.0
+    - DateFrom: '2024-12-29T22:00:00'
+      DateTo: '2024-12-29T22:59:59'
+      Value: 0.009
+    - DateFrom: '2024-12-29T23:00:00'
+      DateTo: '2024-12-29T23:59:59'
+      Value: 0.008
+    LastValidDate: '2024-12-29T23:59:59'
+    Maximum:
+      DateFrom: '2024-12-29T22:00:00'
+      DateTo: '2024-12-29T22:59:59'
+      Value: 0.009
+    Minimum:
+      DateFrom: '2024-12-29T00:00:00'
+      DateTo: '2024-12-29T00:59:59'
+      Value: 0.0
+    Total:
+      DateFrom: '2024-12-29T00:00:00+01:00'
+      DateTo: '2024-12-29T23:59:59+01:00'
+      Value: 0.026

@@ -1,0 +1,47 @@
+- '2024-01-01'
+- heating:
+    month:
+      Average:
+        DateFrom: null
+        DateTo: null
+        Value: 0.0
+      Data:
+      - DateFrom: '2024-12-01T00:00:00'
+        DateTo: '2024-12-31T23:59:59'
+        Value: 1012.444
+      LastValidDate: '2024-01-01'
+      Maximum:
+        DateFrom: null
+        DateTo: null
+        Value: 0.0
+      Minimum:
+        DateFrom: null
+        DateTo: null
+        Value: 0.0
+      Total:
+        DateFrom: '2024-12-01T01:00:00+01:00'
+        DateTo: '2024-12-31T01:00:00+01:00'
+        Value: 1012.444
+  water:
+    month:
+      Average:
+        DateFrom: null
+        DateTo: null
+        Value: 0.0
+      Data:
+      - DateFrom: '2024-12-01T00:00:00'
+        DateTo: '2024-12-31T23:59:59'
+        Value: 12.444
+      LastValidDate: '2024-01-01'
+      Maximum:
+        DateFrom: null
+        DateTo: null
+        Value: 0.0
+      Minimum:
+        DateFrom: null
+        DateTo: null
+        Value: 0.0
+      Total:
+        DateFrom: '2024-12-01T01:00:00+01:00'
+        DateTo: '2024-12-31T01:00:00+01:00'
+        Value: 12.444

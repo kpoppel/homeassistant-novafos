@@ -1,0 +1,18 @@
+- InstallationId: 56781234
+  MeasurementPointId: 66774455
+  Unit:
+    Decimals: 0
+    Description: Vand
+    Id: 32113
+    Name: m³
+    Order: 1
+  type: water
+- InstallationId: 12345678
+  MeasurementPointId: 44556677
+  Unit:
+    Decimals: 0
+    Description: Varme
+    Id: 11332
+    Name: m³
+    Order: 1
+  type: heating
