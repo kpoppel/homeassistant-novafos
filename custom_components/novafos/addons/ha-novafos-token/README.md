@@ -14,18 +14,19 @@ The source code is open for verification.
    You can configure caddy, nginx, Traefik, Tailscale, maybe even Home Assistant itself to use SSL/HTTPS.
 2. Open your configuration.yaml file.
 3. Add a section like this to allow the extension to call the HA REST API.
-
+```
     http:
         cors_allowed_origins:
             - chrome-extension://kjgeibilkbfcionaigcomacomgpmjfgh
-4. If you setup a https proxy like Traefik, you alwant to put this into the http-section:
-
+```
+5. If you setup a https proxy like Traefik, you alwant to put this into the http-section:
+```
     http:
         use_x_forwarded_for: true
         trusted_proxies:
             - <your-proxy-IP>
-
-5. Restart Home Assistant
+```
+6. Restart Home Assistant
 
 #### In case you want to try Traefik
 
