@@ -10,8 +10,8 @@
     />
 
     <!-- UIkit JS -->
-    <script src="uikit.min.js"></script>
-    <script src="uikit-icons.min.js"></script>
+    <script src="../scripts/uikit.min.js"></script>
+    <script src="../scripts/uikit-icons.min.js"></script>
     <title>Token Extractor v0.0.0</title>
     <style>
       body {
@@ -28,29 +28,37 @@
     <div class="uk-container">
       <h2 class="uk-text-lead">Token Inspector</h2>
       <p id="notification-container" class="uk-text-success"></p>
-      <!-- <div class="toggle-container"> -->
       <form id="optionsForm" class="toggle-container">
-          <label for="include_bearer_toggle" class="uk-text-small">
-          <input type="checkbox" id="include_bearer_toggle" />
-          Include bearer word
-        </label>
-        <br>
-        <label for="debug_mode_toggle" class="uk-text-small">
-          <input type="checkbox" id="debug_mode_toggle"/>
-          Debug Mode
-        </label>
-        <br>
-        <label for="ha_url" class="uk-text-small">
-          Home Assistant URL (https)
-          <input type="text" id="ha_url"/>
-        </label>
-        <br>
-        <label for="ha_token" class="uk-text-small">
-          Home Assistant Access token
-          <input type="text" id="ha_token"/>
+        <label for="setup_toggle" class="uk-text-small">
+          <input type="checkbox" id="setup_toggle" />
+          Check this box when installation is completed.
         </label>
       </form>
-      <!-- </div> -->
+      <div class="output-container uk-grid" id="setup-container" style="display: none;">
+        <!-- <div class="toggle-container"> --> <!-- put checkboxes on the same line -->
+        <form id="setupForm" class="toggle-container">
+          <label for="include_bearer_toggle" class="uk-text-small">
+            <input type="checkbox" id="include_bearer_toggle" />
+            Include bearer word
+          </label>
+          <br>
+          <label for="debug_mode_toggle" class="uk-text-small">
+            <input type="checkbox" id="debug_mode_toggle"/>
+            Debug Mode
+          </label>
+          <br>
+          <label for="ha_url" class="uk-text-small">
+            Home Assistant URL (https)
+            <input type="text" id="ha_url"/>
+          </label>
+          <br>
+          <label for="ha_token" class="uk-text-small">
+            Home Assistant Access token
+            <input type="text" id="ha_token"/>
+          </label>
+        </form>
+        <!-- </div> -->
+      </div>
       <div class="output-container uk-grid" id="output-container"></div>
       <div class="output-container uk-grid" id="output-curl-container"></div>
     </div>

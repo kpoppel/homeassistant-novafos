@@ -3,6 +3,7 @@
 
 // uses "options" from options.js
 const outputContainer = document.getElementById("output-container");
+const setupContainer = document.getElementById("setup-container");
 
 function extractTokensFromHAR(requests) {
   return requests.entries
@@ -36,22 +37,46 @@ function extractTokensFromHAR(requests) {
     });
 }
 
+function callHomeAssistantService(access_token) {
+  // Call this function to access the HA Novafox update token action service.
+  // Using a Service/custom action:
+  // Docs:
+  // https://developers.home-assistant.io/docs/api/rest/
+  // https://developers.home-assistant.io/docs/dev_101_services/
+  // Example: 
+  //   https://github.com/phanmemkhoinghiep/homeassistant/blob/0ee37638cb05ae6c6ae0aa7522d51adf042cf487/custom_components/tts_ggcloud/__init__.py#L30
+  const data = {
+    access_token: access_token
+  };
+
+  let headers = new Headers();
+  headers.append('Content-Type', 'application/json');
+  headers.append('Accept', 'application/json');
+  headers.append('Authorization', 'Bearer ' + options.ha_token);
+
+  fetch(options.ha_url + "/api/services/novafos/update_token", {
+      mode: 'cors',
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(data)
+  })
+  .then(response => response.json())
+  .then(json => console.log(json))
+  //.catch(error => console.log('Authorization failed: ' + error.message));
+  .catch(error => {
+    const notificationContainer = document.getElementById("notification-container");
+    notificationContainer.classList = "uk-text-warning"
+    notificationContainer.innerHTML = "Something went wrong: " + error.message;
+    setTimeout(() => {
+      notificationContainer.innerHTML = "";
+      notificationContainer.classList = "uk-text-success";
+    }, 3000);
+  });
+}
+
 function updateHomeAssistantEntity(entityId, newState) {
-  // Curl line:
-  // curl -X POST -H "Authorization: Bearer TOKEN" \
-  //              -H "Content-Type: application/json" \
-  //              -d "{\"state\": \"2024-09-05T23:59:59+02:00\", 
-  //                   \"attributes\": {\"token\": \"I am the value\"}}"
-  //              http://x.x.x.x:8123/api/states/sensor.novafos_valid_date_for_data
-  // For HASS test
-  //const HAUrl = 'http://x.x.x.x:8123/api/states/'+entityId;
-  //const HAtoken = 'eyyadayada';
-  // For production instance:
-  //const HAUrl = 'https://hass.mydomain.lan/api/states/'+entityId;
-  //const HAUrl = 'https://hass.mydomain.lan/api/states/sensor.novafos_valid_date_for_data'
-  //const HAtoken = 'eyyadayada';
-  //
-  // entityId can be dropped when I expand the Novafos plugin in HA to have a service call endpoint.
+  // This function just serves as an example to update a (any) entity with new attributes from JavaScript)
+  //  I leave it here for myself, but it was used before adding the action service to the HA extension.
   date = new Date();
   isoDate = date.toISOString(); // 2024-09-06T23:27:56.592Z
 
@@ -70,7 +95,7 @@ function updateHomeAssistantEntity(entityId, newState) {
   headers.append('Accept', 'application/json');
   headers.append('Authorization', 'Bearer ' + options.ha_token);
 
-  fetch(options.ha_url, {
+  fetch(options.ha_url + "/api/states/" + entityId, {
       mode: 'cors',
       method: 'POST',
       headers: headers,
@@ -82,87 +107,34 @@ function updateHomeAssistantEntity(entityId, newState) {
 }
 
 function displayTokens(tokens) {
-  const outputContainer = document.getElementById("output-container");
   tokens.forEach((token) => {
     const container = document.createElement("div");
     container.classList.add("uk-margin");
     const card = document.createElement("div");
     card.classList.add("uk-card", "uk-card-default", "uk-card-body");
-
+    const buttonContainer = document.createElement("div");
     const urlTitle = document.createElement("h6");
     urlTitle.classList.add("uk-card-title", "uk-text-default");
     urlTitle.innerText = token.url;
 
-    const tokenValue = document.createElement("textarea");
-    tokenValue.classList.add(
-      "uk-textarea",
-      "uk-form-small",
-//      "uk-width-1-1",
-      "uk-width-2xlarge"
-    );
-    tokenValue.innerText = getToken(token);
-
-    const buttonContainer = document.createElement("div");
-    const inspectButton = document.createElement("button");
-    inspectButton.classList.add(
-      "uk-button",
-      "uk-margin-right",
-      "uk-button-primary",
-      "uk-text-default",
-      "uk-text-capitalize",
-      "uk-margin-top",
-    );
-    inspectButton.innerText = "Inspect token in jwt.io";
-    inspectButton.addEventListener("click", () => {
-      const jwtInspectUrl = `https://jwt.io/?token=${encodeURIComponent(
-        getToken(token),
-      )}`;
-      window.open(jwtInspectUrl, "_blank");
-    });
-
-    const copyButton = document.createElement("button");
-    copyButton.classList.add(
-      "uk-button",
-      "uk-button-secondary",
-      "uk-text-default",
-      "uk-text-capitalize",
-      "uk-margin-top",
-    );
-    copyButton.innerText = "Copy token";
-    copyButton.addEventListener("click", () => {
-      copyToClipboard(getToken(token));
-      const notificationContainer = (document.getElementById(
-        "notification-container",
-      ).innerHTML = "Token copied successfully.");
-      setTimeout(() => {
-        notificationContainer.innerHTML = "";
-      }, 3000);
-    });
+    container.appendChild(card);
+    card.appendChild(urlTitle);
+    card.appendChild(buttonContainer);
 
     // Create a button to send the token to Home Assistant
-    // Manual for now - it could be done automatically as the token is found
-    // whenever the Novafos page is updated.
-    const curlValue = document.createElement("textarea");
-    curlValue.classList.add(
-      "uk-textarea",
-      "uk-form-small",
-//      "uk-width-1-1",
-      "uk-width-2xlarge"
-    );
-    curlValue.innerText = getCurlCommand(token);
-
     const webhookButton = document.createElement("button");
     webhookButton.classList.add(
       "uk-button",
-      "uk-button-secondary",
+      "uk-button-primary",
       "uk-text-default",
       "uk-text-capitalize",
       "uk-margin-top",
     );
     webhookButton.innerText = "Send token to Home Assistant";
     webhookButton.addEventListener("click", () => {
-      updateHomeAssistantEntity('sensor.novafos_valid_date_for_data', getToken(token));
-
+      // If updating an entity:
+      //updateHomeAssistantEntity('sensor.novafos_valid_date_for_data', getToken(token));
+      callHomeAssistantService(getToken(token))
       const notificationContainer = (document.getElementById(
         "notification-container",
       ).innerHTML = "Token sent to Home Assistant.");
@@ -170,15 +142,73 @@ function displayTokens(tokens) {
         notificationContainer.innerHTML = "";
       }, 3000);
     });
-
-    container.appendChild(card);
-    card.appendChild(urlTitle);
-    card.appendChild(tokenValue);
-    card.appendChild(curlValue);
-    buttonContainer.appendChild(inspectButton);
-    buttonContainer.appendChild(copyButton);
     buttonContainer.appendChild(webhookButton);
-    card.appendChild(buttonContainer);
+
+    // Stuff turned on if debug switch is checked.
+    if (options.debug_mode_toggle) {
+      // Create a field with the token value
+      const tokenValue = document.createElement("textarea");
+      tokenValue.classList.add(
+        "uk-textarea",
+        "uk-form-small",
+        "uk-width-2xlarge"
+      );
+      tokenValue.innerText = getToken(token);
+      card.appendChild(tokenValue);
+
+      // Create a field with a curl command to sent to Home Assistant for manual testing or if it is not using HTTPS.
+      const curlValue = document.createElement("textarea");
+      curlValue.classList.add(
+        "uk-textarea",
+        "uk-form-small",
+        "uk-width-2xlarge"
+      );
+      curlValue.innerText = getCurlCommand(token);
+      card.appendChild(curlValue);
+
+      // Create a button to copy the token to clipboard
+      const copyButton = document.createElement("button");
+      copyButton.classList.add(
+        "uk-button",
+        "uk-button-secondary",
+        "uk-text-default",
+        "uk-text-capitalize",
+        "uk-margin-top",
+      );
+      copyButton.innerText = "Copy token";
+      copyButton.addEventListener("click", () => {
+        copyToClipboard(getToken(token));
+        const notificationContainer = (document.getElementById(
+          "notification-container",
+        ).innerHTML = "Token copied successfully.");
+        setTimeout(() => {
+          notificationContainer.innerHTML = "";
+        }, 3000);
+      });
+
+      // Create a button to send the token for some inspection at jwt.io
+      const inspectButton = document.createElement("button");
+      inspectButton.classList.add(
+        "uk-button",
+        "uk-margin-right",
+        "uk-button-secondary",
+        "uk-text-default",
+        "uk-text-capitalize",
+        "uk-margin-top",
+      );
+      inspectButton.innerText = "Inspect token in jwt.io";
+      inspectButton.addEventListener("click", () => {
+        const jwtInspectUrl = `https://jwt.io/?token=${encodeURIComponent(
+          getToken(token),
+        )}`;
+        window.open(jwtInspectUrl, "_blank");
+      });
+
+      buttonContainer.appendChild(copyButton);
+      buttonContainer.appendChild(inspectButton);
+    }
+
+    // Add all elements to the panel
     outputContainer.appendChild(container);
   });
 }
@@ -193,10 +223,9 @@ function getToken(token) {
 function getCurlCommand(token) {
   const isoDate = new Date().toISOString(); // 2024-09-06T23:27:56.592Z
   return 'curl -X POST -H "Authorization: Bearer ' + options.ha_token +
-         '" -H "Content-Type: application/json" -d "{\\"state\\": \\"' + isoDate +
-         '\\", \\"attributes\\": {\\"token\\": \\"' +
+         '" -H "Content-Type: application/json" -d "{\\"access_token\\": \\"' +
          token.authorizationHeader.replace("Bearer ", "") +
-         '\\"}}" ' + options.ha_url
+         '\\"}" ' + options.ha_url + "/api/services/novafos/update_token"
 }
 
 function copyToClipboard(text) {
@@ -213,43 +242,22 @@ function copyToClipboard(text) {
 }
 
 function updatePanel() {
+  // Clear panel
+  setupContainer.style.display = 'none';
   outputContainer.innerHTML = "";
 
-  chrome.devtools.network.getHAR(function (requests) {
-    const tokens = extractTokensFromHAR(requests);
-    displayTokens(tokens);
-    /*
-    Here update Home Assistant with token using a sensor update in the Novafos plugin:
-    rest_command:
-      update_webhook_sensor:
-        url: https://my_home_assistant_url/api/states/{{sensor_id}}
-        method: POST
-        headers:
-          authorization: !secret ha_secret_bearer_token
-        payload: '{"state":"{{state}}", "attributes":{{attributes_json}} }'
-        content_type:  'application/json; charset=utf-8'
-        verify_ssl: true
+  // Display setup area if the setup checkbox is unchecked
+  if (!options.setup_toggle) {
+    //console.log("Setup not completed")
+    setupContainer.style.display = 'block';
+  } else {
+    //console.log("Setup was completed, ready to go.")
 
-      A state update could have the key in the attributes so it does not get stored
-      in the state database.
-
-      Using a Service/custom action:
-      Docs:
-      https://developers.home-assistant.io/docs/api/rest/
-      https://developers.home-assistant.io/docs/dev_101_services/
-      Example: 
-         https://github.com/phanmemkhoinghiep/homeassistant/blob/0ee37638cb05ae6c6ae0aa7522d51adf042cf487/custom_components/tts_ggcloud/__init__.py#L30
-
-      If I can get the Novafos plugin to have a service hook:
-      curl \
-        -H "Content-Type: application/json" \
-        -H "Authorization: Bearer TOKEN" \
-        -d '{"token": "NOVAFOS-TOKEN"}' \
-        http://localhost:8123/api/services/novafos/token
-
-      curl -H "Authorization: Bearer eyyadayada" -H "Content-Type: application/json" http://x.x.x.x:8123/api/services
-    */
-  });
+    chrome.devtools.network.getHAR(function (requests) {
+      const tokens = extractTokensFromHAR(requests);
+      displayTokens(tokens);
+    });
+  }
 }
 
 /* Entry point code */
@@ -264,4 +272,4 @@ function handleRequestFinished(request) {
 }
 
 chrome.devtools.network.onRequestFinished.addListener(handleRequestFinished);
-updatePanel();
+
