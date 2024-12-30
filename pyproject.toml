@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "Novafos"
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+]
+asyncio_default_fixture_loop_scope = "class"
+filterwarnings = [
+    'ignore::DeprecationWarning'
+]
+log_cli_level = "DEBUG"
+log_cli = true
+
+# Required modules for testing:
+#
+# pip install pytest pytest-asyncio pytest-mock pytest-regressions
