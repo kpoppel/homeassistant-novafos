@@ -1,0 +1,73 @@
+---
+networks:
+  traefik:
+    driver: bridge
+    name: traefik
+
+services:
+  # Load Balancer / SSL / Web Server
+  traefik:
+    image: traefik:3.1
+    container_name: traefik
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    environment:
+      - CF_API_EMAIL=
+      - CF_API_KEY=
+    volumes:
+      - './acme/acme.json:/acme.json'
+      - './static_config/:/static_config'
+      - '/var/run/docker.sock:/var/run/docker.sock'
+      - '/etc/localtime:/etc/localtime:ro'
+    networks:
+      - traefik
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.api.rule=Host(`<----YOUR_DOMAIN---->`)'
+      - 'traefik.http.routers.api.entrypoints=https'
+      - 'traefik.http.routers.api.service=api@internal'
+      - 'traefik.http.routers.api.tls=true'
+      - 'traefik.http.routers.api.tls.certresolver=letsencrypt'
+    ports:
+      # HTTP/S
+      - '80:80'
+      - '443:443'
+    command:
+      - '--api'
+      - '--providers.docker=true'
+      - '--providers.docker.exposedbydefault=false'
+      - '--entrypoints.http=true'
+      - '--entrypoints.http.address=:80'
+      - '--entrypoints.http.http.redirections.entrypoint.to=https'
+      - '--entrypoints.http.http.redirections.entrypoint.scheme=https'
+      - '--entrypoints.https=true'
+      - '--entrypoints.https.address=:443'
+      # Configuration for non-docker endpoints
+      - '--providers.file.directory=/static_config'
+      - '--providers.file.watch=true'
+      # Allow internal self signed SSL certs for https endpoints
+      - '--serversTransport.insecureSkipVerify=true'
+      # Certificate generation. Use staging while testing:
+      # HTTP challenge creates a certificate per service.
+      - '--certificatesresolvers.letsencrypt.acme.httpchallenge=true'
+      - '--certificatesResolvers.letsencrypt.acme.httpchallenge.entrypoint=http'
+      # Use DNS challenge for owned domain where a TXT record can be created. (See ACME-DNS on Github)
+      # See also: https://doc.traefik.io/traefik/user-guides/docker-compose/acme-dns/
+      #- '--certificatesresolvers.myresolver.acme.dnschallenge=true'
+      #- '--certificatesresolvers.myresolver.acme.dnschallenge.provider=ovh'
+      #- '--certificatesresolvers.letsencrypt.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory'
+      - '--certificatesresolvers.letsencrypt.acme.caserver=https://acme-v02.api.letsencrypt.org/directory'
+      - '--certificatesresolvers.letsencrypt.acme.tlschallenge=true'
+      - '--certificatesResolvers.letsencrypt.acme.email=<----YOUR_EMAIL---->'
+      - '--certificatesResolvers.letsencrypt.acme.storage=acme.json'
+      # Logging
+      - '--log=true'
+      - '--log.level=WARN'
+      #- '--log.level=DEBUG'
+    # These are only used if DNS challenge selected above
+    #environment:
+    #  - "OVH_ENDPOINT=xxx"
+    #  - "OVH_APPLICATION_KEY=xxx"
+    #  - "OVH_APPLICATION_SECRET=xxx"
+    #  - "OVH_CONSUMER_KEY=xxx"

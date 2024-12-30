@@ -1,0 +1,16 @@
+## Dynamic configuration
+## Put this file in static_config/
+http:
+  services:
+    homeassistant:
+      loadBalancer:
+        servers:
+          - url: 'http://<----YOUR HOME ASSISTANT IP---->:8123'
+
+  routers:
+    homeassistant:
+      rule: 'Host(`hass.<---- YOUR DOMAIN ---->`)'
+      entryPoints: https
+      service: 'homeassistant'
+      tls:
+        certresolver: letsencrypt
