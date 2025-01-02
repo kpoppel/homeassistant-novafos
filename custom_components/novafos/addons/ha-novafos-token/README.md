@@ -23,7 +23,7 @@ Chrome or extension compatible browser.  Access to Home Assistant via HTTPS.  If
 ```
     http:
         cors_allowed_origins:
-            - chrome-extension://kjgeibilkbfcionaigcomacomgpmjfgh
+            - chrome-extension://dmapekhggdbdjoppelapaknlhkmdphbc
 ```
 4. If you setup a https proxy like Traefik, you alwant to put this into the http-section:
 ```
