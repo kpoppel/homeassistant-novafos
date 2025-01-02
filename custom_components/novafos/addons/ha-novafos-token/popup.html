@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- UIkit CSS -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/uikit@3.17.8/dist/css/uikit.min.css"
+    />
+
+    <!-- UIkit JS -->
+    <script src="../scripts/uikit.min.js"></script>
+    <script src="../scripts/uikit-icons.min.js"></script>
+    <title>Token Extractor v0.0.0</title>
+    <style>
+      body {
+        padding: 20px;
+      }
+
+      .toggle-container {
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="uk-container">
+      <h2 class="uk-text-lead">Token Inspector</h2>
+      <p id="notification-container" class="uk-text-success"></p>
+
+      <!-- Checkbox used for setup -->
+      <form id="optionsForm" class="toggle-container">
+        <label for="setup_toggle" class="uk-text-small">
+          <input type="checkbox" id="setup_toggle" />
+          Check this box when installation is completed.
+        </label>
+      </form>
+
+      <!-- Form shown when setting options -->
+      <div class="uk-grid" id="setup-container" style="display: none;">
+        <!-- <div class="toggle-container"> --> <!-- put checkboxes on the same line -->
+        <form id="setupForm" class="toggle-container">
+          <label for="ha_url" class="uk-text-small">
+            Home Assistant URL (https)
+            <input type="text" id="ha_url"/>
+          </label>
+          <br>
+          <label for="ha_token" class="uk-text-small">
+            Home Assistant Access token
+            <input type="text" id="ha_token"/>
+          </label>
+          <br>
+          <label for="debug_mode_toggle" class="uk-text-small">
+            <input type="checkbox" id="debug_mode_toggle"/>
+            Developer Mode
+          </label>
+        </form>
+      </div>
+      <!-- Developer form -->
+      <div class="uk-grid" id="developer-container" style="display: none;">
+        <form id="developerForm" class="toggle-container">
+          <label for="ha_url_dev" class="uk-text-small">
+            Home Assistant (Dev) URL (https)
+            <input type="text" id="ha_url_dev"/>
+          </label>
+          <br>
+          <label for="ha_token_dev" class="uk-text-small">
+            Home Assistant (Dev) Access token
+            <input type="text" id="ha_token_dev"/>
+          </label>
+          <br>
+          <label for="include_bearer_toggle" class="uk-text-small">
+            <input type="checkbox" id="include_bearer_toggle" />
+            Include bearer word
+          </label>
+          <br>
+        </form>
+        <!-- </div> -->
+      </div>
+
+      <!-- Popup shown when extracting tokens when setup is completed -->
+      <div class="uk-margin" id="output-container" style="display: block;">
+        <div class="uk-card uk-card-default uk-card-body">
+          <div>
+            <h6 class="uk-card-title uk-text-default" id="token-url"></h6>
+          </div>
+            <div class="uk-text-break" id="output-token"></div>
+            <div class="uk-text-break" id="output-curl"></div>
+            <button class="uk-button uk-button-primary uk-text-default uk-text-capitalize uk-margin-top" id="ha-button">
+            Send token to Home Assistant
+          </button>
+        </div>
+      </div>
+
+    </div> <!-- top level div -->
+    <script src="options.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

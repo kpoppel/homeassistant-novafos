@@ -1,17 +1,28 @@
 {
-  "name": "HomeAssistant Novafos Token",
-  "description": "Retrieve Bearer token from Novafos to inject into Home Assisant and the Novafos plugin.",
-  "version": "1.0.0",
-  "permissions": [
-    "storage"
-  ],
-  "manifest_version": 3,
-  "devtools_page": "devtools/devtools.html",
-
-  "icons": {
-    "16": "images/icon16.png",
-    "32": "images/icon32.png",
-    "48": "images/icon48.png",
-    "128": "images/icon128.png"
+    "manifest_version": 3,
+    "name": "HomeAssistant Novafos Token",
+    "description": "Grab Novafos access token for Home Assistant",
+    "version": "1.0",
+    "action": {
+        "default_popup": "popup.html",
+        "default_icon": {
+            "16": "images/icon16.png",
+            "32": "images/icon32.png",
+            "48": "images/icon48.png",
+            "128":"images/icon128.png"
+        },
+        "default_width": 400,
+        "default_height": 400
+    },    
+    "permissions": [
+      "webRequest",
+      "storage",
+      "webNavigation"
+    ],
+    "host_permissions": [
+        "<all_urls>"
+    ],    
+    "background": {
+      "service_worker": "background.js"
+    }
   }
-}
