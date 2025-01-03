@@ -18,21 +18,26 @@ Chrome or extension compatible browser.  Access to Home Assistant via HTTPS.  If
 1. Make sure your Home Assistant is using https.  This is important because
    calling a http (unsecure) site from a secure page is not allowed, nor advisable.
    You can configure caddy, nginx, Traefik, Tailscale, maybe even Home Assistant itself to use SSL/HTTPS.
-2. Open your configuration.yaml file.
-3. Add a section like this to allow the extension to call the HA REST API.
-```
-    http:
-        cors_allowed_origins:
-            - chrome-extension://dmapekhggdbdjoppelapaknlhkmdphbc
-```
-4. If you setup a https proxy like Traefik, you alwant to put this into the http-section:
+2. If you setup a https proxy like Traefik, you alwant to put this into the http-section:
 ```
     http:
         use_x_forwarded_for: true
         trusted_proxies:
             - <your-proxy-IP>
 ```
-5. Restart Home Assistant
+3. Restart Home Assistant
+
+### If you face trouble with CORS
+
+If you for some reason get CORS erors, you may need to add permission for the extension to do what it does. Try this:
+1. Open your configuration.yaml file.
+2. Add a section like this to allow the extension to call the HA REST API.
+```
+    http:
+        cors_allowed_origins:
+            - chrome-extension://ghmhahihkmbifnlhcjfldfjlmmcjppko
+            - https://minforsyning-2.kmd.dk
+```
 
 ## In case you want to try Traefik
 
@@ -56,6 +61,9 @@ Will I publish the extension on the Chrome store? No.
 2. Enter your Home Assistant HTTPS URL (no trailing /, please): ```https://homeassist.my.home```
 3. Enter your Home Assistant long lived access token: ```eyJhbGciOiJIU....```
 4. Click the "Check this box ...".
+
+If you have a test instance (or just another instance) of Home Assistant, you can click the development mode button and fill out a
+second set of fields.  As long as this box is checked service calls will go to this other instance.
 
 # 🎯 How to Use
 

@@ -18,7 +18,7 @@ async def async_setup_services(hass: HomeAssistant, coordinator: DataUpdateCoord
 	DATA_SCHEMA = vol.Schema(
 		{
 			vol.Required("access_token", default=""): str,
-			vol.Required("access_token_date_updated", default=datetime.now().strftime("%Y-%m-%dT%H:%M:%S")): str
+			vol.Required("access_token_date_updated", default=""): str
 		}
 	)
 	@callback
@@ -32,7 +32,10 @@ async def async_setup_services(hass: HomeAssistant, coordinator: DataUpdateCoord
 			_LOGGER.error(f"Service action called, but token based flow is not configured.")
 			return False
 		coordinator.access_token = call.data['access_token']
-		coordinator.access_token_date_updated = call.data['access_token_date_updated']
+		if call.data['access_token_date_updated'] == "":
+			coordinator.access_token_date_updated = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+		else:
+			coordinator.access_token_date_updated = call.data['access_token_date_updated']
 		# Then call the coordinator to update itself.
 		await coordinator.async_refresh()
 
