@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from datetime import timedelta
+from zoneinfo import ZoneInfo
 import logging
 import json
 import requests
@@ -28,10 +29,11 @@ class Novafos:
     Primary exported interface for KMD API wrapper.
     '''
     def __init__(self, username, password, supplierid):
-        self._username = username
-        self._password = password
-        self._supplierid = supplierid
+        self._username = username  #TODO: REMOVE
+        self._password = password  #TODO: REMOVE
+        self._supplierid = supplierid #TODO: REMOVE
         self._api_url = "https://easy-energy-plugin-api.kmd.dk"
+        self.tz = ZoneInfo("Europe/Copenhagen")
 
         self._access_token = ""
         self._customer_id = ""
@@ -42,9 +44,6 @@ class Novafos:
 
         # NOTE: Added because of reCAPCTHA login screen
         self._access_token_date_updated = ""
-
-        # TODO: Add docker host config here instead of directly on the authentication function.
-        # ...
 
         # Zoom level is the granuarity of the retrieved data
         self._zoom_level = {
@@ -57,48 +56,6 @@ class Novafos:
 
     def _print_json(self, map, context="JSON dump"):
         _LOGGER.debug("%s:\n %s", context, json.dumps(map, indent=4, sort_keys=True, ensure_ascii=False))
-
-    def _generate_random_string(self, size):
-        rand = random.SystemRandom()
-        return ''.join(rand.choices(string.ascii_letters + string.digits, k=size))
-
-    def _generate_code(self) -> tuple[str, str]:
-        rand = random.SystemRandom()
-        code_verifier = ''.join(rand.choices(string.ascii_letters + string.digits, k=67))
-
-        code_sha_256 = hashlib.sha256(code_verifier.encode('utf-8')).digest()
-        b64 = base64.urlsafe_b64encode(code_sha_256)
-        code_challenge = b64.decode('utf-8').replace('=', '')
-
-        return (code_verifier, code_challenge)
-
-    def authenticate_using_selenium(self, selenium_host_url):
-        """ This function relies on a remote browser controlled by selenium.  While the recaptcha will eventually
-            figure out this is an automated login, it might just work most of the time.
-            The code varies the time from data is entered (as a password manager vould do) to the point where
-            <ENTER> is 'pressed'.
-            If using selenium/standalone-firefox, access the VNC terminal to check up on things.
-        """
-        self._access_token_date_updated = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-        data = {
-             "username": self._username,
-             "password": self._password,
-             "supplierid": self._supplierid[0:3]
-        }
-        # The selenium response is copying the reponse from the oidc endpoint.
-        response = requests.post(selenium_host_url, json=data)
-        try:
-            response_dict = json.loads(response.json())
-            if response_dict['access_token'] == "":
-                _LOGGER.error('Failed to retrieve bearer token (maybe you are a robot?)')
-                self._access_token = ""
-                return False
-            self._access_token = f"{response_dict['token_type']} {response_dict['access_token']}"
-            _LOGGER.debug('Got bearer token (access to API was Ok) valid for %ss: %s', response_dict['expires_in'], self._access_token)
-            return True
-        except:
-            _LOGGER.error('Failed to retrieve bearer token (no JSON returned)')
-            return False
 
     def authenticate_using_access_token(self, access_token, access_token_date_updated):
         """ The only reason for this function is due to to a reCAPTCHA challenge on the Novafos login page.
@@ -113,113 +70,18 @@ class Novafos:
             _LOGGER.error(f"Token update does not seem to have a valid length. Please check again. (This message is normal the first time the integration starts)")
             return False
         _LOGGER.debug("Access token set to: '%s' at date: '%s'", self._access_token, self._access_token_date_updated)
-        return True
 
-    def authenticate(self):
-        """
-        The OIDC login procedure automated.
-        Use the username/password/supplierid credentials to login and get a code token from which to retrieve the Bearer token.
-        """
-        nonce = self._generate_random_string(size=42)
-        state = self._generate_random_string(size=42)
-        code_verifier, code_challenge = self._generate_code()
-        # Tokens generated during the handshake:
-        request_verification_token = None
-        code = None
-
-        # ID determined between Novafos and the OIDC service at KMD
-        client_id = '1DA5CFAF-F67F-4DA1-A1A6-513A7768F994'
-        # Our identification - generate e new one everytime we update data
-        app = uuid.uuid4()
-
-        # The capabilities of the OIDC service can be fetched here:
-        # https://easy-energy-identity.kmd.dk/.well-known/openid-configuration
-        # This is useful for a dynamic setup where different services must be contacted.
-        # Here we know which one and how to do it.
-
-        # The first step is to actually load the login webpage.  KMD made sure to include a hidden form value
-        # probably to ensure the one who submits the form is also the one who loaded it in the first place.
-        ######################
-        # A session is needed for the login part as cookies are exchanged as well.
-        session = requests.Session()
-
-        headers = {}
-
-        params = {
-            'ReturnUrl': f'/oidc/authorize?client_id={client_id}&redirect_uri=https%3A%2F%2Fminforsyning-2.kmd.dk%2Flogin&response_type=code&scope=openid%20profile%20pluginapi_int&nonce={nonce}&state={state}&code_challenge={code_challenge}&code_challenge_method=S256&utility={self._supplierid}&login_type=mf&post_logout_redirect_uri=https%3A%2F%2Fminforsyning-2.kmd.dk%2Flogin&app={app}',
-        }
-
-        response = session.get('https://easy-energy-identity.kmd.dk/Identity/Account/Sign/Login', params=params, headers=headers)
-
-        # Get the 'RequestVerificationToken' out of response TEXT:
-        #<input name="__RequestVerificationToken" type="hidden" value="CfDJ8BtjbcM0azZLgmK58SCaJRwb4UK7iGEmt5ENx8EhXvgpt3GFKIwLR4svDgNa0sHp9mNOemf4df0IYV25vmqQD-QFI7Dh7sVcM-D5U-smZpjnu7xajAQEHWx-fT_pzj-jXhOskLj4G22355Z2JysR_tM" /></
-        # It is always 155 characters as well it seems..
-        # If this code is not present, authentication will fail.
-        rvt = re.search(r'(?<=__RequestVerificationToken" type="hidden" value=")([\w-]+)', response.text)
-        request_verification_token = rvt.group(0)
-        _LOGGER.debug('Got login form request_verification_token = %s', request_verification_token)
-
-        # Second step is to submit the login form with the username and password.
-        # In the response from the server we get a secret code to be used later
-        ######################
-        headers = {
-            'content-type': 'application/x-www-form-urlencoded',
-        }
-
-        params = {
-            'returnUrl': f'/oidc/authorize?client_id={client_id}&redirect_uri=https%3A%2F%2Fminforsyning-2.kmd.dk%2Flogin&response_type=code&scope=openid%20profile%20pluginapi_int&nonce={nonce}&state={state}&code_challenge={code_challenge}&code_challenge_method=S256&utility={self._supplierid}&login_type=mf&post_logout_redirect_uri=https%3A%2F%2Fminforsyning-2.kmd.dk%2Flogin&app={app}',
-        }
-
-        data = f'Input.Email={self._username}&Input.Password={self._password}&__RequestVerificationToken={request_verification_token}'
-
-        response = session.post('https://easy-energy-identity.kmd.dk/Identity/Account/Sign/Login', params=params, headers=headers, data=data)
-
-        # At this point user/password should have been accepted. (if "forkert" is in text then login did not succeed)
-
-        # url field contains the next code we need.
-        #  https://minforsyning-2.kmd.dk/login?code=0gRigEdqZKwcB_fdPqaiW3t410UrXLXXEC-eT6vrXuw&state=b%27SP0DKBBZ5YX4L8W4S70E08SD2Q5MSUOIHC05W90D0Y%27
-        code = response.url[41:84]
-
-        # Something is wrong if the code contains the word "Account".  Too many wrong login attempts causes account lockout condition
-        if "Account" in code:
-            raise LoginFailed('Code not retrieved correctly. Plugin will not continue login process.  Check user/pass/supplierID')
-        if "Lockout" in code:
-            raise('The Novafos account is subject to lockout due to too many failed login attempts. You may be subject to a 30 min lockout.')
-
-        _LOGGER.debug('Got one-time session code (supplierid and user/pass was ok): %s', code)
-
-        # Third step is to use the code from the authentication service to verify we are the right one
-        # The correct code and the state issued from the beginning must be correct.
-        # Interestingly enough it seems this step can be omitted entirely - keeping it anyway.
-        #####################
-        headers = {}
-
-        params = {
-            'code': code,
-            'state': state,
-        }
-
-        response = requests.get('https://minforsyning-2.kmd.dk/login', params=params, headers=headers)
-
-        # Finally the Bearer token can be retrieved from the oicd token endpoint.
-        # The code is reused to verify we can get the token.
-        #####################
-        headers = {}
-
-        data = {
-            'grant_type': 'authorization_code',
-            'client_id': client_id,
-            'code_verifier': code_verifier, 
-            'code': code,
-            'redirect_uri': 'https://minforsyning-2.kmd.dk/login',
-        }
-
-        response = requests.post('https://easy-energy-identity.kmd.dk/oidc/token', headers=headers, data=data)
-        self._access_token = f"{response.json()['token_type']} {response.json()['access_token']}"
-
-        _LOGGER.debug(f'Got bearer token (access to API was Ok) valid for %ss: %s', response.json()['expires_in'], self._access_token)
-
-        return True
+        # Check token age
+        now = datetime.now()
+        # Allow 45 minutes since the last token update.  If updating after this point, disallow API accesses.
+        if self._access_token == "" or datetime.strptime(self._access_token_date_updated, '%Y-%m-%dT%H:%M:%S') + timedelta(minutes=45) < now:
+            _LOGGER.debug("Access_token too old or not set correctly while authenticating")
+            return False
+        else:
+            # Configure other data necessary for fetching data
+            self._get_customer_id()
+            self._get_active_meters()
+            return True
 
     def _get_customer_id(self):
         # Need to retrieve the customer ID from the user profile to fetch data.
@@ -330,7 +192,7 @@ class Novafos:
                  'Value': 0.01,   <--- has one measurement registered
                  'UnitName': 'm³', 
                  'Label': '', 
-                 'IsComplete': False,  <--- but is incomplete!
+                 'IsComplete': False,  <--- but is incomplete!  This is ignored in the web interface. Data is displayed regardless.
                  'IsSettlement': False
                 },
                 {'DateFrom': '2022-01-12T00:00:00+01:00',
@@ -338,7 +200,7 @@ class Novafos:
                  'Value': 0.0,   <--- no measurements
                  'UnitName': 'm³', 
                  'Label': '', 
-                 'IsComplete': False,  <--- and incomplete
+                 'IsComplete': False,  <--- and incomplete.  This is ignored in the web interface. Data is displayed regardless.
                  'IsSettlement': False
                 }],
              'Label': None
@@ -395,6 +257,7 @@ class Novafos:
             "Unit": metering_device["Unit"],
             "ZoomLevel": zoomLevel,
             "PriceData":"false", #optional
+            "Interval": "PT1H",
             "DateFrom": dateFrom,
             "DateTo": dateTo,
         }
@@ -412,15 +275,15 @@ class Novafos:
         last_valid_date = ""
         if result_json["Series"]:
             for data in result_json["Series"][0]["Data"]:
-                # Only add complete data, unless it is the Year or Month zoom levels
-                if data["IsComplete"] == True or zoomLevel < 2:
-                    series_data.append({
-                        "DateFrom" : data["DateFrom"],
-                        "DateTo" : data["DateTo"],
-                        "Value" : data["Value"]
-                    })
-                    # NOTE: Assuming data is sorted by date - which it is
-                    last_valid_date = data["DateTo"]
+                # Add data - complete or not!
+                series_data.append({
+                    "DateFrom" : data["DateFrom"],
+#                    FIXME: Not needed
+#                    "DateTo" : data["DateTo"],
+                    "Value" : data["Value"]
+                })
+                # NOTE: Assuming data is sorted by date - which it is
+                last_valid_date = data["DateTo"]
 
         # Return first data series.  Unknown how more series could come from a single metering device?
         meter_data = {
@@ -483,7 +346,8 @@ class Novafos:
             #_LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
             if series['Data']:
                 for month_data in series['Data']:
-                    _LOGGER.debug(f"{type} {month_data['DateFrom']} - {month_data['DateTo']} - {month_data['Value']}")
+                    #FIXME remove _LOGGER.debug(f"{type} {month_data['DateFrom']} - {month_data['DateTo']} - {month_data['Value']}")
+                    _LOGGER.debug(f"{type} {month_data['DateFrom']} - {month_data['Value']}")
                 _LOGGER.debug(f"Month Total/Avg/Min/Max for {type}: {series['Total']['Value']} / {series['Average']['Value']} / {series['Minimum']['Value']} / {series['Maximum']['Value']}")
             else:
                 _LOGGER.warning("The KMD API returned no monthly data.  Expect sensors to signal 'unavailable'")
@@ -505,10 +369,24 @@ class Novafos:
             #_LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
             if series['Data']:
                 for day_data in series['Data']:
-                    _LOGGER.debug(f"{type} {day_data['DateFrom']} - {day_data['DateTo']} - {day_data['Value']}")
+                    # FIXME: remove _LOGGER.debug(f"{type} {day_data['DateFrom']} - {day_data['DateTo']} - {day_data['Value']}")
+                    _LOGGER.debug(f"{type} {day_data['DateFrom']} - {day_data['Value']}")
                 _LOGGER.debug(f"Day Total/Avg/Min/Max/ValidDate for {type}: {series['Total']['Value']} / {series['Average']['Value']} / {series['Minimum']['Value']} / {series['Maximum']['Value']} / {self._last_valid_day}")
             else:
                 _LOGGER.warning("The KMD API returned no daily data.  Expect sensors to signal 'unavailable'")
+
+    def _local_to_utc(self, local_time):
+        """ Convert a local time to UTC time including timezone and summer(DST)/winter time ofsets. """
+        local_time_with_timezone = local_time.astimezone(self.tz)
+        utc_offset = local_time_with_timezone.utcoffset()
+        return local_time.astimezone(ZoneInfo("UTC")) - utc_offset
+
+    def _local_str_to_utc_str(self, local_time_str):
+        """ Convert a local ISO time string to UTC time strimg."""
+        return self._utc_to_isostr(self._local_to_utc(local_time_str.fromisoformat()))
+
+    def _utc_to_isostr(self, utc_time):
+        return utc_time.isoformat().replace("+00:00", "Z")
 
     def _get_hour_data(self, days_back = None, from_date = None):
         """
@@ -516,27 +394,36 @@ class Novafos:
            If it is not set, data returned is from the last valid day.
 
         from_date can be set instead to the day in the month from which to start getting data.  All days until present day will be retrieved.
-           this is a datetime object
+           this is a datetime object with timezone data
         """
+        # from_date_input =  datetime.fromtimestamp(1736002800.0).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=274)
+        # end_date_input = from_date_input.replace(hour=23, minute=59, second=59, microsecond=0)
+        # from_date = _to_utc(from_date_input).isoformat().replace("+00:00", "Z")
+        # end_date  = _to_utc(end_date_input).isoformat().replace("+00:00", "Z")        
+
+        # End date is always present time
+        end_date_input = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         if days_back:
-            start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-            duration = range(days_back, 0, -1)
+            from_date_input = end_date_input - timedelta(days=days_back)
         elif from_date:
-            start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-            duration = range((start_date - from_date).days, 0, -1)
-        else:
-            start_date = datetime.strptime(self._last_valid_day, '%Y-%m-%dT%H:%M:%S%z').replace(hour=0, minute=0, second=0, microsecond=0)
-            duration = range(1)
+            from_date_input = from_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            days_back = (end_date_input - from_date_input).days
+        duration = range(days_back)
+
+        # TEMPORARY
+        #self._meter_data['water'] = { 'hour': { 'Data': [], 'Maximum':{'Value':0}, 'Minimum':{'Value':0}, 'Average':{'Value':0}, 'Total':{'Value':0}}}
+        #_LOGGER.debug(f"{self._meter_data} {list(duration)}")
+        #### ^^^
 
         first_day = [True] * len(self._meter_data)
         for day in duration:
-            now = (start_date - timedelta(days=day)).replace(hour=0, minute=0, second=0, microsecond=0)
-            # I would claim this is a bug in the REST service.  Asking for data for an hour also return the hour after. So we ask for data until 22:59 to
-            # not get data from 00:00-00:59 the day after. That throws off the avg/min/max numbers for the day.  So -1 hour on 'from' and 'to'
-            dateFrom = (now - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-            dateTo =  now.replace(hour=22, minute=59, second=59, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-            #dateTo = now.replace(hour=23, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-            _LOGGER.debug(f"Getting Hour data {day} day(s) back in time from {dateFrom} to {dateTo}")
+            # "DateFrom":"2024-03-31T22:00:00.000Z", "DateTo":"2024-04-02T21:59:59.999Z",  <- sommertid
+            # "DateFrom":"2024-10-27T23:00:00.000Z", "DateTo":"2024-10-28T22:59:59.999Z"   <- vintertid
+            now = from_date_input + timedelta(days=day)
+            dateFrom = self._utc_to_isostr(self._local_to_utc(now))
+            dateTo   = self._utc_to_isostr(self._local_to_utc(now.replace(hour=23, minute=59, second=59, microsecond=0)))
+            _LOGGER.debug(f"\nGetting Hour data {days_back-day} day(s) back in time from {dateFrom} to {dateTo}")
+
             time_series = self._get_all_consumption_timeseries(dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level['Hour'])
 
             for idx, series in enumerate(time_series):
@@ -559,69 +446,98 @@ class Novafos:
         for key, series_type in self._meter_data.items():
             if 'hour' in series_type:
                 for hour_data in series_type['hour']['Data']:
-                    _LOGGER.debug(f"{hour_data['DateFrom']} - {hour_data['DateTo']} - {hour_data['Value']}")
+                    #FIXME: remove _LOGGER.debug(f"{hour_data['DateFrom']} - {hour_data['DateTo']} - {hour_data['Value']}")
+                    _LOGGER.debug(f"{hour_data['DateFrom']} - {hour_data['Value']}")
                 _LOGGER.debug(f"Total/Avg/Min/Max: {series_type['hour']['Total']['Value']} / {series_type['hour']['Average']['Value']} / {series_type['hour']['Minimum']['Value']} / {series_type['hour']['Maximum']['Value']}")
             #else:
             #    _LOGGER.warning("The KMD API returned no hourly data.  Expect sensors to signal 'unavailable'")
 
+    def get_meter_types(self):
+        return self._active_meters
+
+    def get_statistics(self, from_date):
+        """ Retrieve statistics data.  Plainly retrieve hourly consumption data since some date.
+            Assumes authentication already completed.
+            TODO:  Eventually this should replace the get_latest() function and only a single sensor should be exported
+        """
+        # Fetch each day must be individually because the server only returns values one day at a time.
+        # It seems Novafos has valid data varying from 5 days in the past to yesterday.
+        self._get_hour_data(from_date=from_date)
+
+        # Lastly make an entry for the last valid day in the dataset.  Maybe someone can use this.
+        # NOTE: (relies on _get_day_data() having been called!)
+        self._meter_data['water']["valid_date"] = {}
+        self._meter_data['water']["valid_date"]["Value"] = self._last_valid_day
+        if 'heating' in self._meter_data:
+            self._meter_data['heating']["valid_date"] = {}
+            self._meter_data['heating']["valid_date"]["Value"] = self._last_valid_day
+
+        # TODO: simply data fetch as 'hour' is the only one needed eventually
+        statistics = { 'water' : self._meter_data['water']['hour']['Data'] }
+        if 'heating' in self._meter_data:
+            statistics['heating'] = self._meter_data['heating']['hour']['Data']
+
+        _LOGGER.debug(f"Statistics: {statistics}")
+        return statistics
+
+    def get_dummy_data(self):
+        _LOGGER.debug("Returning dummy data")
+        now = datetime.now()
+        dateTo =  now.strftime("%Y-%m-%dT%H:%M:%S+00:00")
+        dateTwo =  now.strftime("%Y-%m-%dT%H:%M:%S")
+        return {
+            'water' : {
+                'day': {
+                    'Data': [
+                        {'DateFrom': None, 'DateTo': None, 'Value': None},
+                    ],
+                    'Total':   {'Value': None, 'DateFrom': None, 'DateTo': None},
+                    'Average': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                    'Maximum': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                    'Minimum': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                    'LastValidDate': dateTo
+                },
+                'year': {
+                    'Data': [
+                        {'DateFrom': None, 'DateTo': None, 'Value': None}
+                    ],
+                    'Total':   {'Value': None, 'DateFrom': None, 'DateTo': None},
+                    'Average': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                    'Maximum': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                    'Minimum': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                    'LastValidDate': dateTo
+                },
+                'month': {
+                    'Data': [
+                        {'DateFrom': None, 'DateTo': None, 'Value': None}
+                    ],
+                    'Total':   {'Value': None, 'DateFrom': None, 'DateTo': None},
+                    'Average': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                    'Maximum': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                    'Minimum': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                    'LastValidDate': dateTo
+                },
+                'hour': {
+                    'Data': [
+                        {'DateFrom': None, 'DateTo': None, 'Value': None},
+                    ],
+                    'Total':   {'Value': None, 'DateFrom': None, 'DateTo': None},
+                    'Average': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                    'Maximum': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                    'Minimum': {'Value': None, 'DateFrom': None, 'DateTo': None},
+                    'LastValidDate': dateTwo
+                },
+                'valid_date': {'Value': dateTo }
+            }
+        }
 
     def get_latest(self):
         # NOTE: This part is all due to login screen reCAPTCHA down to ^^
         now = datetime.now()
         # Allow 45 minutes since the last token update.  If updating after this point, return dummy data.
         if self._access_token == "" or datetime.strptime(self._access_token_date_updated, '%Y-%m-%dT%H:%M:%S') + timedelta(minutes=45) < now:
-            _LOGGER.debug("Access_token too old or not set correctly:")
-            dateTo =  now.strftime("%Y-%m-%dT%H:%M:%S+00:00")
-            dateTwo =  now.strftime("%Y-%m-%dT%H:%M:%S")
-            return {
-                'water' : {
-                    'day': {
-                        'Data': [
-                            {'DateFrom': None, 'DateTo': None, 'Value': None},
-                        ],
-                        'Total':   {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Average': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Maximum': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Minimum': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'LastValidDate': dateTo
-                    },
-                    'year': {
-                        'Data': [
-                            {'DateFrom': None, 'DateTo': None, 'Value': None}
-                        ],
-                        'Total':   {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Average': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Maximum': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Minimum': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'LastValidDate': dateTo
-                    },
-                    'month': {
-                        'Data': [
-                            {'DateFrom': None, 'DateTo': None, 'Value': None}
-                        ],
-                        'Total':   {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Average': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Maximum': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Minimum': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'LastValidDate': dateTo
-                    },
-                    'hour': {
-                        'Data': [
-                            {'DateFrom': None, 'DateTo': None, 'Value': None},
-                        ],
-                        'Total':   {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Average': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Maximum': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Minimum': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'LastValidDate': dateTwo
-                    },
-                    'valid_date': {'Value': dateTo }
-                }
-            }
+            return self.get_dummy_data()
         ###^^^^^
-        self._get_customer_id()
-
-        self._get_active_meters()
 
         # NOTE: Returned is the first element in the meters list.
         #       This works for people with one water meter.

@@ -46,6 +46,16 @@ MIN_TIME_BETWEEN_UPDATES = timedelta(hours=6)
 WATER_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
     NovafosSensorDescription(
         sensor_type = "water",
+        key = "statistics",
+        name = "Water statistics",
+        entity_registry_enabled_default = True,
+        native_unit_of_measurement = UnitOfVolume.CUBIC_METERS,
+        device_class = SensorDeviceClass.WATER,
+        icon = "mdi:water",
+        state_class = SensorStateClass.TOTAL
+    ),
+    NovafosSensorDescription(
+        sensor_type = "water",
         key = "year",
         name = "Year Total",
         entity_registry_enabled_default = True,
@@ -97,6 +107,16 @@ WATER_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
 )
 
 HEATING_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
+    NovafosSensorDescription(
+        sensor_type = "heating",
+        key = "statistics",
+        name = "Heating statistics",
+        entity_registry_enabled_default = True,
+        native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR,
+        device_class = SensorDeviceClass.ENERGY,
+        icon = "mdi:lightning-bolt-circle",
+        state_class = SensorStateClass.MEASUREMENT
+    ),
     NovafosSensorDescription(
         sensor_type = "heating",
         key = "year",
