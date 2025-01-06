@@ -102,15 +102,19 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                 data = await self.hass.async_add_executor_job(self.api.get_statistics, one_year_back)
                 _sum = 0.0
             else:
+                # Fetch data this many days back
+                delta_days = 1
                 # Fetch data since last statistics updated
-                _LOGGER.debug(f"Last statistics: {dt.fromtimestamp(last_stats[statistic_id][0]['start'])}-{dt.fromtimestamp(last_stats[statistic_id][0]['end'])}")
+                start = dt.fromtimestamp(last_stats[statistic_id][0]['start'])  - timedelta(days=delta_days)
+                end   = dt.fromtimestamp(last_stats[statistic_id][0]['end'])
+                _LOGGER.debug(f"Last statistics: {start}-{end}")
                 # TODO: Retrieve data fixed 10 days before last statistics update - could be set to just get since the last data point.
                 #start = dt.fromtimestamp(last_stats[statistic_id][0]['end']) # end of last statistics point, asking for this gives no data points.
-                start = dt.fromtimestamp(last_stats[statistic_id][0]['start'])
+                # Retrieve stored statistics one day further back because this is where the starting sum comes from.
                 stat = await get_instance(self.hass).async_add_executor_job(
                     statistics_during_period,
                     self.hass,
-                    start,
+                    start - timedelta(days=1),
                     None,
                     {statistic_id},
                     "hour",
@@ -119,7 +123,8 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                 )
                 # Returns: defaultdict(<class 'list'>, {'sensor.novafos_water_statistics': [{'start': 1736031600.0, 'end': 1736035200.0, 'sum': 134.73000000000002}]})
                 _LOGGER.debug(f"Statistics in period: {stat}")
-                data = await self.hass.async_add_executor_job(self.api.get_statistics, start - timedelta(days=1))
+                
+                data = await self.hass.async_add_executor_job(self.api.get_statistics, start)
                 if statistic_id in stat:
                     _sum = cast(float, stat[statistic_id][0]['sum'])
                 else:
@@ -139,8 +144,8 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
             for val in data[meter_type]:
                 # Add timezone to dataset as Home Assistant works in UTC
                 from_time = dt_util.parse_datetime(f"{val["DateFrom"]}").replace(tzinfo=dt_util.get_time_zone(self.hass.config.time_zone))
-                _LOGGER.debug(f"Adding: {from_time}, {val["Value"]}")
                 _sum += val["Value"]
+                _LOGGER.debug(f"Adding: {from_time}, {val["Value"]}, {_sum}")
 
                 statistics.append(
                     StatisticData(

@@ -23,9 +23,6 @@ class Novafos:
     Primary exported interface for KMD API wrapper.
     '''
     def __init__(self, username, password, supplierid):
-        self._username = username  #TODO: REMOVE
-        self._password = password  #TODO: REMOVE
-        self._supplierid = supplierid #TODO: REMOVE
         self._api_url = "https://easy-energy-plugin-api.kmd.dk"
         self.tz = ZoneInfo("Europe/Copenhagen")
 
@@ -305,76 +302,6 @@ class Novafos:
             meter_data.append(self._get_consumption_timeseries(active_meter, dateFrom, dateTo, zoomLevel))
         return meter_data
 
-    # def _get_year_data(self):
-    #     dateFrom = datetime.now().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-    #     dateTo = datetime.now().replace(month=12, day=31, hour=23, minute=59, second=59, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-    #     _LOGGER.debug(f"Getting Year data from {dateFrom} to {dateTo}")
-    #     time_series = self._get_all_consumption_timeseries(dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level['Year'])
-
-    #     for series in time_series:
-    #         type = series.pop('type')
-    #         self._meter_data[type]["year"] = series
-
-    #         if self._last_valid_day:
-    #             self._meter_data[type]["year"]["LastValidDate"] = self._last_valid_day
-
-    #         if series['Data']:
-    #             #_LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
-    #             _LOGGER.debug(f"Year Total for {type}: {series['Total']['Value']}")
-    #         else:
-    #             _LOGGER.warning("The KMD API returned no yearly data.  Expect sensors to signal 'unavailable'")
-
-    # def _get_month_data(self):
-    #     # These get all months of the year
-    #     #dateFrom = datetime.now().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-    #     #dateTo = datetime.now().replace(month=12, hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-    #     # Get just the current month
-    #     now = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    #     dateFrom = now.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-    #     dateTo = (now.replace(now.year + int(now.month/12), now.month%12+1, 1)-timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-
-    #     _LOGGER.debug(f"Getting Month data from {dateFrom} to {dateTo}")
-    #     time_series = self._get_all_consumption_timeseries(dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level['Month'])
-
-    #     for series in time_series:
-    #         type = series.pop('type')
-    #         self._meter_data[type]["month"] = series
-
-    #         if self._last_valid_day:
-    #             self._meter_data[type]["month"]["LastValidDate"] = self._last_valid_day
-
-    #         #_LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
-    #         if series['Data']:
-    #             for month_data in series['Data']:
-    #                 #FIXME remove _LOGGER.debug(f"{type} {month_data['DateFrom']} - {month_data['DateTo']} - {month_data['Value']}")
-    #                 _LOGGER.debug(f"{type} {month_data['DateFrom']} - {month_data['Value']}")
-    #             _LOGGER.debug(f"Month Total/Avg/Min/Max for {type}: {series['Total']['Value']} / {series['Average']['Value']} / {series['Minimum']['Value']} / {series['Maximum']['Value']}")
-    #         else:
-    #             _LOGGER.warning("The KMD API returned no monthly data.  Expect sensors to signal 'unavailable'")
-
-    # def _get_day_data(self):
-    #     now = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    #     dateFrom = now.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-    #     dateTo = (now.replace(now.year + int(now.month/12), now.month%12+1, 1)-timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-    #     _LOGGER.debug(f"Getting Day data from {dateFrom} to {dateTo}")
-    #     time_series = self._get_all_consumption_timeseries(dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level['Day'])
-
-    #     for series in time_series:
-    #         type = series.pop('type')
-    #         self._meter_data[type]["day"] = series
-
-    #         #self._last_valid_day = self._meter_data["day"]["Data"][-1]["DateFrom"]
-    #         self._last_valid_day = self._meter_data[type]["day"]["LastValidDate"]
-
-    #         #_LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
-    #         if series['Data']:
-    #             for day_data in series['Data']:
-    #                 # FIXME: remove _LOGGER.debug(f"{type} {day_data['DateFrom']} - {day_data['DateTo']} - {day_data['Value']}")
-    #                 _LOGGER.debug(f"{type} {day_data['DateFrom']} - {day_data['Value']}")
-    #             _LOGGER.debug(f"Day Total/Avg/Min/Max/ValidDate for {type}: {series['Total']['Value']} / {series['Average']['Value']} / {series['Minimum']['Value']} / {series['Maximum']['Value']} / {self._last_valid_day}")
-    #         else:
-    #             _LOGGER.warning("The KMD API returned no daily data.  Expect sensors to signal 'unavailable'")
-
     def _local_to_utc(self, local_time):
         """ Convert a local time to UTC time including timezone and summer(DST)/winter time ofsets. """
         local_time_with_timezone = local_time.astimezone(self.tz)
@@ -387,70 +314,6 @@ class Novafos:
 
     def _utc_to_isostr(self, utc_time):
         return utc_time.isoformat().replace("+00:00", "Z")
-
-    # def _get_hour_data(self, days_back = None, from_date = None):
-    #     """
-    #     If days_back is set, the function returns valid data this many days back.  A 1 could result in no valid data returned.
-    #        If it is not set, data returned is from the last valid day.
-
-    #     from_date can be set instead to the day in the month from which to start getting data.  All days until present day will be retrieved.
-    #        this is a datetime object with timezone data
-    #     """
-    #     # from_date_input =  datetime.fromtimestamp(1736002800.0).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=274)
-    #     # end_date_input = from_date_input.replace(hour=23, minute=59, second=59, microsecond=0)
-    #     # from_date = _to_utc(from_date_input).isoformat().replace("+00:00", "Z")
-    #     # end_date  = _to_utc(end_date_input).isoformat().replace("+00:00", "Z")        
-
-    #     # End date is always present time
-    #     end_date_input = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    #     if days_back:
-    #         from_date_input = end_date_input - timedelta(days=days_back)
-    #     elif from_date:
-    #         from_date_input = from_date.replace(hour=0, minute=0, second=0, microsecond=0)
-    #         days_back = (end_date_input - from_date_input).days
-    #     duration = range(days_back)
-
-    #     # TEMPORARY
-    #     #self._meter_data['water'] = { 'hour': { 'Data': [], 'Maximum':{'Value':0}, 'Minimum':{'Value':0}, 'Average':{'Value':0}, 'Total':{'Value':0}}}
-    #     #_LOGGER.debug(f"{self._meter_data} {list(duration)}")
-    #     #### ^^^
-
-    #     first_day = [True] * len(self._meter_data)
-    #     for day in duration:
-    #         # "DateFrom":"2024-03-31T22:00:00.000Z", "DateTo":"2024-04-02T21:59:59.999Z",  <- sommertid
-    #         # "DateFrom":"2024-10-27T23:00:00.000Z", "DateTo":"2024-10-28T22:59:59.999Z"   <- vintertid
-    #         now = from_date_input + timedelta(days=day)
-    #         dateFrom = self._utc_to_isostr(self._local_to_utc(now))
-    #         dateTo   = self._utc_to_isostr(self._local_to_utc(now.replace(hour=23, minute=59, second=59, microsecond=0)))
-    #         _LOGGER.debug(f"\nGetting Hour data {days_back-day} day(s) back in time from {dateFrom} to {dateTo}")
-
-    #         time_series = self._get_all_consumption_timeseries(dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level['Hour'])
-
-    #         for idx, series in enumerate(time_series):
-    #             type = series.pop('type')
-
-    #             if first_day[idx]:
-    #                 self._meter_data[type]['hour'] = series
-    #                 first_day[idx] = False
-    #             elif series['Data']:
-    #                 # If the dataset returned is not empty, move the valid date and mix/max/avg data forward.
-    #                 # That will ensure the dataset reflects the latest values in case they are >24h old
-    #                 self._meter_data[type]['hour']['Data'] = self._meter_data[type]['hour']['Data'] + series['Data']
-    #                 self._meter_data[type]['hour']['Total'] = series['Total']
-    #                 self._meter_data[type]['hour']['Average'] = series['Average']
-    #                 self._meter_data[type]['hour']['Maximum'] = series['Maximum']
-    #                 self._meter_data[type]['hour']['Minimum'] = series['Minimum']
-    #                 self._meter_data[type]['hour']['LastValidDate'] = series['LastValidDate']
-
-    #             #_LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
-    #     for key, series_type in self._meter_data.items():
-    #         if 'hour' in series_type:
-    #             for hour_data in series_type['hour']['Data']:
-    #                 #FIXME: remove _LOGGER.debug(f"{hour_data['DateFrom']} - {hour_data['DateTo']} - {hour_data['Value']}")
-    #                 _LOGGER.debug(f"{hour_data['DateFrom']} - {hour_data['Value']}")
-    #             _LOGGER.debug(f"Total/Avg/Min/Max: {series_type['hour']['Total']['Value']} / {series_type['hour']['Average']['Value']} / {series_type['hour']['Minimum']['Value']} / {series_type['hour']['Maximum']['Value']}")
-    #         #else:
-    #         #    _LOGGER.warning("The KMD API returned no hourly data.  Expect sensors to signal 'unavailable'")
 
     def get_statistics(self, from_date = None):
         """
@@ -500,45 +363,3 @@ class Novafos:
 
     def get_dummy_data(self):
         return {'water': [{'DateFrom': None, 'Value': None}]}
-    
-    # def get_latest(self):
-    #     # NOTE: This part is all due to login screen reCAPTCHA down to ^^
-    #     now = datetime.now()
-    #     # Allow 45 minutes since the last token update.  If updating after this point, return dummy data.
-    #     if self._access_token == "" or datetime.strptime(self._access_token_date_updated, '%Y-%m-%dT%H:%M:%S') + timedelta(minutes=45) < now:
-    #         return self.get_dummy_data()
-    #     ###^^^^^
-
-    #     # NOTE: Returned is the first element in the meters list.
-    #     #       This works for people with one water meter.
-    #     #       If this is a problem, file a feature extension or a pull request to fix.
-    #     #       Look for "time_series[0]"
-    #     # Next up retrieve data series for:
-    #     # - valid days in this month
-    #     #  Daily data can be fetched across years
-    #     #  Total/min/max/avg consumption is calculated over the fetched dataset
-    #     #  This also set the self._last_valid_day field
-    #     self._get_day_data()
-
-    #     # - year to date
-    #     self._get_year_data()
-
-    #     # - this month
-    #     self._get_month_data()
-
-    #     # - valid hours for the last valid day
-    #     # Each day must be fetched individually because the server only returns values from the FromDate day.
-    #     # It seems Novafos has valid data varying from 5 days in the past to yesterday.
-    #     # This one retrieves data from the first day in the month.
-    #     #self._get_hour_data(from_date=datetime.now().replace(day=1))
-    #     # This one retrieves data 'days_back' days back
-    #     self._get_hour_data(days_back=1)
-
-    #     # Lastly make an entry for the last valid day in the dataset.  Maybe someone can use this.
-    #     self._meter_data['water']["valid_date"] = {}
-    #     self._meter_data['water']["valid_date"]["Value"] = self._last_valid_day
-    #     if 'heating' in self._meter_data:
-    #         self._meter_data['heating']["valid_date"] = {}
-    #         self._meter_data['heating']["valid_date"]["Value"] = self._last_valid_day
-
-    #     return self._meter_data
