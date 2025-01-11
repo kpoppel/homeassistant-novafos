@@ -3,11 +3,8 @@
     "step": {
       "user": {
         "data": {
-          "login_method": "[%key:common::config_flow::data::login_method%]",
-          "username": "[%key:common::config_flow::data::username%]",
-          "password": "[%key:common::config_flow::data::password%]",
           "name": "[%key:common::config_flow::data::name%]",
-          "container_url": "[%key:common::config_flow::data::container_url%]"
+          "use_grouped_sensors": "[%key:common::config_flow::data::use_grouped_sensors%]"
         }
       }
     },

@@ -38,14 +38,10 @@ async def update_listener(hass: HomeAssistant, entry: ConfigEntry):
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Novafos from a config entry."""
-    username = entry.options.get('username')
-    password = entry.options.get('password')
-    supplierid = entry.data.get('supplierid')
-    
     _LOGGER.debug(f"Novafos ConfigData: {entry.data}")
 
     # Use the coordinator which handles regular fetch of API data.
-    api = Novafos(username, password, supplierid)
+    api = Novafos()
     coordinator = NovafosUpdateCoordinator(hass, api, entry)
     # If you do not want to retry setup on failure, use
     await coordinator.async_refresh()
@@ -113,5 +109,31 @@ async def async_migrate_entry(hass, config_entry: ConfigEntry) -> bool:
         hass.config_entries.async_update_entry(config_entry, data=data)
 
         _LOGGER.info("Migration to version %s successful", config_entry.version)
+
+    if config_entry.version == 3:
+        new = {**config_entry.options}
+        data = {**config_entry.data}
+
+        _LOGGER.debug(new)
+        _LOGGER.debug(data)
+
+        if 'username' in new:
+            del new['username']
+        if 'password' in new:
+            del new['password']
+        if 'container_url' in new:
+            del new['container_url']
+        if 'supplierid' in data:
+            del data['supplierid']
+        del data['login_method']
+
+        _LOGGER.debug("After:")
+        _LOGGER.debug(new)
+        _LOGGER.debug(data)
+
+        hass.config_entries.async_update_entry(config_entry, data=data, options=new, version=4)
+
+        _LOGGER.info("Migration to version %s successful", config_entry.version)
+
 
     return True

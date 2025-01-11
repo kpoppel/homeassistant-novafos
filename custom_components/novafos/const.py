@@ -32,6 +32,49 @@ WATER_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
     ),
 )
 
+EXTRA_WATER_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
+    NovafosSensorDescription(
+        sensor_type = "water",
+        key = "statistics_day",
+        name = "Water statistics day",
+        entity_registry_enabled_default = True,
+        native_unit_of_measurement = UnitOfVolume.CUBIC_METERS,
+        device_class = SensorDeviceClass.WATER,
+        icon = "mdi:water",
+        state_class = SensorStateClass.TOTAL
+    ),
+    NovafosSensorDescription(
+        sensor_type = "water",
+        key = "statistics_week",
+        name = "Water statistics week",
+        entity_registry_enabled_default = True,
+        native_unit_of_measurement = UnitOfVolume.CUBIC_METERS,
+        device_class = SensorDeviceClass.WATER,
+        icon = "mdi:water",
+        state_class = SensorStateClass.TOTAL
+    ),
+        NovafosSensorDescription(
+        sensor_type = "water",
+        key = "statistics_month",
+        name = "Water statistics month",
+        entity_registry_enabled_default = True,
+        native_unit_of_measurement = UnitOfVolume.CUBIC_METERS,
+        device_class = SensorDeviceClass.WATER,
+        icon = "mdi:water",
+        state_class = SensorStateClass.TOTAL
+    ),    
+        NovafosSensorDescription(
+        sensor_type = "water",
+        key = "statistic_years",
+        name = "Water statistics year",
+        entity_registry_enabled_default = True,
+        native_unit_of_measurement = UnitOfVolume.CUBIC_METERS,
+        device_class = SensorDeviceClass.WATER,
+        icon = "mdi:water",
+        state_class = SensorStateClass.TOTAL
+    ),
+    )
+
 HEATING_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
     NovafosSensorDescription(
         sensor_type = "heating",
@@ -41,6 +84,49 @@ HEATING_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
         native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR,
         device_class = SensorDeviceClass.ENERGY,
         icon = "mdi:lightning-bolt-circle",
-        state_class = SensorStateClass.MEASUREMENT
+        state_class = SensorStateClass.TOTAL
     ),
 )
+
+EXTRA_HEATING_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
+    NovafosSensorDescription(
+        sensor_type = "heating",
+        key = "statistics_day",
+        name = "Heating statistics day",
+        entity_registry_enabled_default = True,
+        native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR,
+        device_class = SensorDeviceClass.ENERGY,
+        icon = "mdi:lightning-bolt-circle",
+        state_class = SensorStateClass.TOTAL
+    ),
+    NovafosSensorDescription(
+        sensor_type = "heating",
+        key = "statistics_week",
+        name = "Heating statistics week",
+        entity_registry_enabled_default = True,
+        native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR,
+        device_class = SensorDeviceClass.ENERGY,
+        icon = "mdi:lightning-bolt-circle",
+        state_class = SensorStateClass.TOTAL
+    ),
+        NovafosSensorDescription(
+        sensor_type = "heating",
+        key = "statistics_month",
+        name = "Heating statistics month",
+        entity_registry_enabled_default = True,
+        native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR,
+        device_class = SensorDeviceClass.ENERGY,
+        icon = "mdi:lightning-bolt-circle",
+        state_class = SensorStateClass.TOTAL
+    ),    
+        NovafosSensorDescription(
+        sensor_type = "heating",
+        key = "statistic_years",
+        name = "Heating statistics year",
+        entity_registry_enabled_default = True,
+        native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR,
+        device_class = SensorDeviceClass.ENERGY,
+        icon = "mdi:lightning-bolt-circle",
+        state_class = SensorStateClass.TOTAL
+    ),
+    )

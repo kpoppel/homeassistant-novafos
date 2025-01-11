@@ -26,8 +26,7 @@ async def async_setup_services(hass: HomeAssistant, coordinator: DataUpdateCoord
 		"""Handle the service action call."""
 		# Update the coordinator data fields.
 		_LOGGER.debug(f"Update via action service call initiated.")
-		# The user has to configure for token based flow.
-		# Okay, it could be possible to do this withot this requirement, but since all other login methods are not working, this requirement will work.
+
 		if coordinator.entry.data['login_method'] != "Token based":
 			_LOGGER.error(f"Service action called, but token based flow is not configured.")
 			return False

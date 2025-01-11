@@ -17,7 +17,7 @@ from homeassistant.helpers.update_coordinator import (
 import logging
 _LOGGER = logging.getLogger(__name__)
 
-from .const import DOMAIN, WATER_SENSOR_TYPES, HEATING_SENSOR_TYPES
+from .const import DOMAIN, WATER_SENSOR_TYPES, HEATING_SENSOR_TYPES, EXTRA_WATER_SENSOR_TYPES, EXTRA_HEATING_SENSOR_TYPES
 from .model import NovafosSensorDescription
 
 async def async_setup_entry(
@@ -38,9 +38,16 @@ async def async_setup_entry(
     if "water" in coordinator.data:
         for description in WATER_SENSOR_TYPES:
             sensors.append(NovafosWaterSensor(name, coordinator, description))
+        if config.data['use_grouped_sensors']:
+            for description in EXTRA_WATER_SENSOR_TYPES:
+                sensors.append(NovafosWaterSensor(name, coordinator, description))
+
     if "heating" in coordinator.data:
         for description in HEATING_SENSOR_TYPES:
             sensors.append(NovafosWaterSensor(name, coordinator, description))
+        if config.data['use_grouped_sensors']:
+            for description in EXTRA_HEATING_SENSOR_TYPES:
+                sensors.append(NovafosWaterSensor(name, coordinator, description))
 
     async_add_entities(sensors)
 
@@ -60,12 +67,7 @@ class NovafosWaterSensor(CoordinatorEntity, SensorEntity):
         _LOGGER.debug(f"Registering Sensor for {description.name}")
 
         self._attr_name = f"{name} {description.name}"
-
-        # To keep things backwards compatible - water does not get 'water' on the sensor value.
-        if description.sensor_type != "water":
-            self._attr_unique_id = f"{name.lower()}-{coordinator.supplierid}-{description.sensor_type}-{description.key}"
-        else:
-            self._attr_unique_id = f"{name.lower()}-{coordinator.supplierid}-{description.key}"
+        self._attr_unique_id = f"{name.lower()}-{description.sensor_type}-{description.key}"
 
         # Note: Data is stored in self.coordinator.data[self.entity_description.key]
 
@@ -79,5 +81,4 @@ class NovafosWaterSensor(CoordinatorEntity, SensorEntity):
         # State needs to be unknown as the data is in the past and not a current measurement.
         # If a state is set, this will go to the statistics too and make things look funny.
         return None
-        return 0.0 #????
 
