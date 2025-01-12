@@ -7,8 +7,7 @@ from .pynovafos.novafos import Novafos
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-# from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.exceptions import HomeAssistantError
 
 from datetime import datetime as dt
@@ -27,11 +26,13 @@ from homeassistant.util import dt as dt_util
 from homeassistant.const import UnitOfVolume, UnitOfEnergy
 from typing import cast
 
-from .pynovafos.sample_data import (
-    get_active_meters,
-    get_year_sample_data,
-    get_year_sample_data_extra,
-)
+# If debugging, use pre-seeded data:
+# from .pynovafos.sample_data import (
+#     get_active_meters,
+#     get_year_sample_data,
+#     get_year_sample_data_extra,
+# )
+
 import logging
 
 _LOGGER = logging.getLogger(__name__)
@@ -67,34 +68,33 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         """Get the data for Novafos."""
         _LOGGER.debug("Performing token based authentication")
-        # try:
-        debug = True
-        if debug or await self.hass.async_add_executor_job(
+
+        debug = False
+        # If debugging and need to re-seed the database:
+        # if debug:
+        #     # Pre-seed data from file
+        #     self.api._active_meters = get_active_meters()
+        #     self.api._meter_data = get_year_sample_data()
+        #     self.api._meter_data_extra = get_year_sample_data_extra()
+
+        if await self.hass.async_add_executor_job(
             self.api.authenticate_using_access_token,
             self.access_token,
             self.access_token_date_updated,
         ):
             # Retrieve latest data from the API
-            # try:
-            if True:
+            try:
                 _LOGGER.debug("Getting latest statistics")
-                if debug:
-                    self.api._active_meters = get_active_meters()
-                    self.api._meter_data = get_year_sample_data()
-                    self.api._meter_data_extra = get_year_sample_data_extra()
                 await self._insert_statistics(debug)
                 await self._insert_grouped_statistics(debug)
-                return self.api._meter_data
-            # except Exception as ex:
-            #    raise UpdateFailed(f"The device is unavailable: {ex}")
-            # raise ConfigEntryNotReady from ex
+                data = self.api._meter_data
+            except Exception as ex:
+                raise UpdateFailed(f"The service is unavailable: {ex}")
         else:
             data = self.api.get_dummy_data()
-        # except Exception as ex:
-        #    raise UpdateFailed(f"The device is unavailable: {ex}")
 
         # The data is stored in the coordinator as a .data field.
-        _LOGGER.debug("HERE")
+        _LOGGER.debug("Returning from Coordinator with data: %s", data)
         return data
 
     async def _insert_statistics(self, debug) -> None:
