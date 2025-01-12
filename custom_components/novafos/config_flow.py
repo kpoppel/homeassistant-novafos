@@ -110,7 +110,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Anyway, set options related to the chosen login method
         self.options["access_token"] = user_input.get("access_token")
         # Hidden field:
-        self.options["access_token_date_updated"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S") # user_input.get("access_token_date_updated")
+        self.options["access_token_date_updated"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
         return self.async_create_entry(title=f"Novafos: {self.data['name']}", data=self.data, options=self.options)
 
     @staticmethod

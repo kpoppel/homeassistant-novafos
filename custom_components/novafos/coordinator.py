@@ -1,7 +1,7 @@
 """DataUpdateCoordinator for Novafos."""
 from __future__ import annotations
 
-from custom_components.novafos.pynovafos.novafos import Novafos
+from .pynovafos.novafos import Novafos
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant

@@ -1,7 +1,6 @@
 import pytest
 import requests
 
-#@pytest.mark.skip(reason="Need some data to test what is necessary here.")
 def test_get_inactive_meters_water_and_heating(mocker, novafos):
     mock_post = mocker.patch("requests.post")
     mock_response = requests.Response()
@@ -174,3 +173,7 @@ def test_get_active_meters_water_and_heating_ok(mocker, data_regression, novafos
     novafos._get_active_meters()
     # On first run create a yaml file with data from the data structure. Subsequently check against this file.
     data_regression.check(novafos._active_meters)
+
+def test_get_meter_types(mocker, data_regression, novafos):
+    novafos._active_meters = "Return me"
+    assert novafos.get_meter_types() == "Return me"

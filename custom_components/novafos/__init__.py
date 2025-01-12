@@ -1,7 +1,8 @@
 """The novafos integration."""
 from __future__ import annotations
-from custom_components.novafos.coordinator import NovafosUpdateCoordinator
-from custom_components.novafos.services import async_setup_services
+
+from .coordinator import NovafosUpdateCoordinator
+from .services import async_setup_services
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -12,7 +13,7 @@ from .const import DOMAIN
 # The Novafos integration - not on PyPi, just bundled here.
 # Contrary to:
 # https://developers.home-assistant.io/docs/creating_component_code_review#4-communication-with-devicesservices
-from custom_components.novafos.pynovafos.novafos import Novafos
+from .pynovafos.novafos import Novafos
 
 # Development help
 import logging

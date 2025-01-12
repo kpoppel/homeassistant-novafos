@@ -102,89 +102,21 @@ This is how the manual method works:
 
 ## Method 2: Using Chrome add-on (medium advanced, recommended).
 
-Install the Chrome extension in the addons/ha-novafos-token folder.  See the README file in the addons directory for the details.  The extension automates scraping the token and sendign it to Home Assistant.
+Install the Chrome extension from this Github repository: https://github.com/kpoppel/homeassistant-novafos-chrome-addon/releases. README file in that place for the details.
+The extension automates scraping the token and sending it to Home Assistant.
 Note you have to setup Home Assistant to be accessed through HTTPS.
-
-## Method 3: Using Selenium web-driver (advanced, experimental and not recommended)
-
-If you try this method, please bear in mind it is an attempt to automate that which cannot be automated.  Also accept that this is targeted at how the Novafos login page looks like and may need modifications for other suppliers' login screens.  Lastly, I cannot support you if it does not work, you need to debug and help out with more endpoints which looks differently.
-
-This is work in progress too, provided as-is and works-for-me.
-
-With that said...
-
-The principle is to software control the normal login process you would do on the website, and let the browser resolve that part of the process including robot detection.  The software attempts to not look like a robot, and rests on very seldom access because only once per 24h is access really needed.  Combined this hopefully is enough to not get caught in the robot detection heuristics.
-
-What you need to do:
-
-1. You need a docker host and access to build a docker image
-1. Build the docker container using the `Dockerfile` in the `docker`directory
-
-       docker build -t ha/ha-pyapi:1.0 .
-
-1. Run the docker container
-  
-       docker run --name pyapi -p 5000:5000 -p 5900:5900 ha/ha-pyapi:1.0
-
-1. If you stop the container for rebuilding you need to remove the old one before starting a new one
-
-       docker rm pyapi
-
-1. With this container running you now have two endpoints available on `http://<docker_host>:5000/novafos-token` and `http://<docker_host>:5000/novafos-token-test`.  Additionally you have a VNC service running on port `5900`. The VNC password is "secret"
-
-1. You then need to modify the `coordinator.py` file.  Search for `selenium_host_url`and update to match your IP-address of the docker host.
-
-By the way - if you are lazy, you may try out the docker-compose file instead.
-
-### First test
-
-The first test uses the test end-point with a token you put in, and serves the purpose of verifying the container runs as intended and Home Assistant can access it properly.
-
-1. Begin with the `novafos-token-test` URL and update the `pyapi.py` file with a token you got from using Method 1 above.  Rebuild the container after doing this.
-
-1. Bring up your (test) instance of Home Assistant with full debugging info activated and observe the log.  You are looking for
-
-       2022-10-17 00:22:42 DEBUG (MainThread) [custom_components.novafos] Novafos ConfigData: {'supplierid': '<...', 'username': '<...>', 'password': '<...>', 'name': 'Novafos'}
-       2022-10-17 00:22:42 DEBUG (MainThread) [custom_components.novafos.coordinator] Next update at: 2022-10-18 03:03:00.189765
-
-   If the token you put in at the test endpoint is still okay (remember 1 hour validity) you should shortly after see the initial poll after a restart:
-
-       2022-10-17 00:23:05 DEBUG (SyncWorker_3) [custom_components.novafos.pynovafos.novafos] Got bearer token (access to API was Ok) valid for 3599s: Bearer eyLotsOfRandomCharcters...
-       2022-10-17 00:23:05 DEBUG (SyncWorker_2) [custom_components.novafos.pynovafos.novafos] Retrieved customer_id: <...>
-       2022-10-17 00:23:06 DEBUG (SyncWorker_2) [custom_components.novafos.pynovafos.novafos] Got active (water) meters : [{'InstallationId': <...>, 'MeasurementPointId': <...>, 'Unit': {'Id': <...>, 'Name': 'm³', 'Description': 'Vand', 'Decimals': 0, 'Order': 1}}]
-       2022-10-17 00:23:06 DEBUG (SyncWorker_2) [custom_components.novafos.pynovafos.novafos] Getting Day data from 2022-10-01T00:00:00.000Z to 2022-10-31T00:00:00.000Z
-       2022-10-17 00:23:06 DEBUG (SyncWorker_2) [custom_components.novafos.pynovafos.novafos] {
-          "SheetName": null,
-          "Series": [
-              {
-                  "Data": [
-                      {
-                          "DateFrom": "2022-10-01T00:00:00+02:00",
-       ... and so on ...
-
-1. You should see the sensors update as usual.
-
-If all of this works, you know the docker container is running and the service can be accessed from Home Assistant.
-
-### Second test
-
-This is the second test, now using the real endpoint. If you do this many times over in a short timeframe you may get tagged as a robot and will need to login manually and wait for some hours.
-
-1. Start a VNC client and point it to your docker host port `5900`.
-1. Update the `coordinator.py` file to use the `novafos-token`endpoint.
-1. Start Home Assistant.  You should see the same log entries as above, but also in the VNC viewer a browser start up, and the login process complete.  This is the point where you may get stuck and there is really nothing to do about it other than waiting it out.
-
-If this works, let it run and be happy.
 
 ---
 # State and attributes
 
-!Note! Data is delayed in the data warehouse.  Data validity will range from 24h to 5 days ago from today's midnight.  This means the sensor data represents historical data.
+Data is delayed in the data warehouse.  Data validity will range from 24h to 5 days ago from today's midnight.  This means the sensor data represents historical data and that the sensors presented by the integration have no current state.  However all sensors are statistics sensors and can be shown using statistics cards, statistics graph and through apex-charts like any other sensor with real-time data.
 
-The integration creates the following sensors:
-* sensor.novafos_year_total
-  * The total consumption until the last valid date
-* sensor.novafos_month_total
+This means we have a slightly different visualisation flow compared to other sensors.
+
+The integration creates the following sensors for water/heating (here water used an an example).  "novafos" is configurable, this is the default value:
+* sensor.novafos_water_statistics
+  * Statistics sensor with hourly resolution.  Has (historical) state, max, min, mean value.
+* sensor.novafos_water_statistics_{day|week|month|year} (optional)
   * The total consumption current until the last valid date
 * sensor.novafos_day_total
   * The total consumtion on the last valid date

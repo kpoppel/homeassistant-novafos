@@ -326,6 +326,10 @@ class Novafos:
 
         from_date is a datetime object with the date in local time from which to start retrieving data.  All days until present day will be retrieved.
         """
+        if from_date == None:
+            # If no date, just return - no default behaviour
+            return None
+        
         # Calculate date range to process - clean time settings too
         from_date_input = from_date.replace(hour=0, minute=0, second=0, microsecond=0)
         end_date_input = datetime.now().replace(hour=23, minute=59, second=59, microsecond=0)
@@ -375,13 +379,19 @@ class Novafos:
 
         Args:
             meter_type: A string water, heating designating which data series to group
+            prev_day_data: A data structure ('2024-01-02', 0.67, 0.502, 0.168, 0.67, 0.419)
+                with the possible last statistic data
 
         Returns:
             A dictionary where keys are dates in the format "YYYY-MM-DD"
             and values are lists of tuples representing hourly measurements 
             for that day.
-
-        BUG: Does not calculated cirrectly.  but close enough for now for the statistics?
+            The returned data is (date, sum, change, max, min, mean)
+            sum = sum of consumption for all 24 hours
+            change = change of sum since yesterday
+            max = max value of the hourly data
+            min = min calue of the hourly data
+            mean = mean value of the hourly data
         """
         daily_data = {}
         daily_stats = []
@@ -391,16 +401,32 @@ class Novafos:
             #_LOGGER.debug(item)
             date_str = item['DateFrom']
             measurement = item['Value']
-            date = self._local_str_to_utc(date_str)
+            #date = self._local_str_to_utc(date_str)
+            date = datetime.fromisoformat(date_str)
             date_key = date.strftime("%Y-%m-%d")  # Format date as "YYYY-MM-DD" 
             if date_key not in daily_data:
                 daily_data[date_key] = []
             daily_data[date_key].append((date_str, measurement)) 
 
+        #_LOGGER.debug(sorted(daily_data.items()))
+
         for date, hourly_data in sorted(daily_data.items()):
             if len(hourly_data) == 24:  # Ensure 24 hourly measurements
                 daily_sum = round(sum(measurement for _, measurement in hourly_data),3)
                 daily_sums.append((date, daily_sum))
+                #_LOGGER.debug(daily_sums[-1])
+
+        # Handle the first day
+        curr_date, curr_sum = daily_sums[0]
+        curr_sum = round(curr_sum, 3)
+        daily_stats.append((
+            curr_date,
+            curr_sum, #sum
+            curr_sum, #change
+            curr_sum, #min
+            curr_sum, #max
+            curr_sum  #mean
+        ))
 
         if len(daily_sums) > 1:
             for i in range(1, len(daily_sums)):  # Iterate from the second day onwards
@@ -415,8 +441,48 @@ class Novafos:
                     round((curr_sum + prev_sum) / 2, 3)
                 ))
 
-        _LOGGER.debug(f"Daily stats: {daily_stats}")
+        #_LOGGER.debug(f"Daily stats: {daily_stats}")
         return daily_stats
+
+        # Code to calculate max min mean for the underlying hourly dataset.
+        # This is what the webinterface does.  It does not however maintain the
+        # magnitude of the data, but that of the underlying dataset.
+        #
+        # for date, hourly_data in sorted(daily_data.items()):
+        #     if len(hourly_data) == 24:  # Ensure 24 hourly measurements
+        #         daily_sum = round(sum(measurement for _, measurement in hourly_data),3)
+        #         min_val = round(min(measurement for _, measurement in hourly_data), 3)
+        #         max_val = round(max(measurement for _, measurement in hourly_data), 3)
+        #         mean_val = round(daily_sum / 24, 3)
+        #         daily_sums.append((date, daily_sum, max_val, min_val, mean_val))
+        #         #_LOGGER.debug(daily_sums[-1])
+
+        # # Handle the first day
+        # curr_date, curr_sum, curr_max, curr_min, curr_mean = daily_sums[0]
+        # daily_stats.append((
+        #     curr_date,
+        #     curr_sum,
+        #     curr_sum, #change
+        #     curr_min,
+        #     curr_max,
+        #     curr_mean
+        # ))
+
+        # if len(daily_sums) > 1:
+        #     for i in range(1, len(daily_sums)):  # Iterate from the second day onwards
+        #         prev_date, prev_sum, prev_max, prev_min, prev_mean = daily_sums[i-1]
+        #         curr_date, curr_sum, curr_max, curr_min, curr_mean = daily_sums[i]
+        #         daily_stats.append((
+        #             curr_date, 
+        #             curr_sum,
+        #             round(curr_sum - prev_sum,3),  # Calculate change for the current day
+        #             curr_min,
+        #             curr_max,
+        #             curr_mean
+        #         ))
+
+        # _LOGGER.debug(f"Daily stats: {daily_stats}")
+        # return daily_stats
 
     def get_grouped_statistics(self, meter_type: str, grouping: str):
         """
@@ -442,7 +508,7 @@ class Novafos:
             # Determine the start date of the first week in the data
             first_date = datetime.strptime(daily_stats[0][0], "%Y-%m-%d")
             first_week_start = first_date - timedelta(days=first_date.weekday())  # Shift to Monday
-            print(first_date, first_week_start, first_date.weekday())
+            #_LOGGER.debug(f"First week: {first_date}, {first_week_start}, {first_date.weekday()}")
 
             current_week_start = first_week_start
             week_sum = 0
@@ -452,14 +518,14 @@ class Novafos:
                 if date_obj >= current_week_start and date_obj < (current_week_start + timedelta(days=7)):
                     week_sum += daily_sum
                 else:
-                    grouping_sums.append((current_week_start.strftime("%Y-%m-%d"), week_sum))
+                    grouping_sums.append((current_week_start.strftime("%Y-%m-%d"), round(week_sum, 3)))
                     # Move to the next Monday
                     current_week_start += timedelta(days=7) 
                     week_sum = daily_sum 
 
             # Add the last week's data
             if week_sum > 0:
-                grouping_sums.append((current_week_start.strftime("%Y-%m-%d"), week_sum)) 
+                grouping_sums.append((current_week_start.strftime("%Y-%m-%d"), round(week_sum, 3))) 
         elif grouping == 'month':
             current_month = None
             grouping_sum = 0
@@ -471,14 +537,14 @@ class Novafos:
                     grouping_sum = daily_sum
                 elif current_month != date_obj.month:
                     print("New month", date_obj.month)
-                    grouping_sums.append(((date_obj.replace(day=1) - timedelta(days=1)).strftime("%Y-%m-%d"), grouping_sum))
+                    grouping_sums.append(((date_obj.replace(day=1) - timedelta(days=1)).strftime("%Y-%m-%d"), round(grouping_sum, 3)))
                     current_month = date_obj.month
                     grouping_sum = daily_sum
                 else:
                     grouping_sum += daily_sum
 
             if grouping_sum > 0:  # Add the last month's data
-                grouping_sums.append((date_obj.replace(day=1).strftime("%Y-%m-%d"), grouping_sum)) 
+                grouping_sums.append((date_obj.replace(day=1).strftime("%Y-%m-%d"), round(grouping_sum, 3))) 
 
         elif grouping == 'year':
             current_year = None
@@ -491,7 +557,7 @@ class Novafos:
                     grouping_sum = daily_sum
                 elif current_year != date_obj.year:
                     print("New year", date_obj.year)
-                    grouping_sums.append((f"{current_year}-01-01", grouping_sum)) 
+                    grouping_sums.append((f"{current_year}-01-01", round(grouping_sum, 3))) 
                     current_year = date_obj.year
                     grouping_sum = daily_sum
                 else:
@@ -499,18 +565,19 @@ class Novafos:
 
             if grouping_sum > 0:  # Add the last year's data
                 print("Add year", grouping_sum, current_year)
-                grouping_sums.append((f"{current_year}-01-01", grouping_sum)) 
+                grouping_sums.append((f"{current_year}-01-01", round(grouping_sum, 3))) 
 
-        print(grouping_sums)
+        _LOGGER.debug(f"Grouping_sums: {grouping_sums}")
+
         if grouping_sums: 
             first_grouping_date, first_grouping_sum = grouping_sums[0]
             grouping_stats.append((
-                first_grouping_date, 
-                first_grouping_sum, 
+                first_grouping_date,
+                round(first_grouping_sum, 3), 
                 0.0,  # No change for the first grouping
-                first_grouping_sum, 
-                first_grouping_sum, 
-                first_grouping_sum 
+                round(first_grouping_sum, 3), 
+                round(first_grouping_sum, 3), 
+                round(first_grouping_sum, 3) 
             ))
 
         if len(grouping_sums) > 1:
@@ -518,14 +585,15 @@ class Novafos:
                 prev_grouping_date, prev_grouping_sum = grouping_sums[i-1]
                 curr_grouping_date, curr_grouping_sum = grouping_sums[i]
                 grouping_stats.append((
-                    curr_grouping_date, 
-                    curr_grouping_sum, 
-                    curr_grouping_sum - prev_grouping_sum, 
+                    curr_grouping_date,
+                    round(curr_grouping_sum, 3), 
+                    round(curr_grouping_sum - prev_grouping_sum, 3), 
                     min(curr_grouping_sum, prev_grouping_sum), 
                     max(curr_grouping_sum, prev_grouping_sum), 
-                    (curr_grouping_sum + prev_grouping_sum) / 2 
+                    round((curr_grouping_sum+prev_grouping_sum)/2 , 3)
                 ))
 
+        _LOGGER.debug(f"Grouped stats: {grouping_stats}")
         return grouping_stats
 
     def get_dummy_data(self):

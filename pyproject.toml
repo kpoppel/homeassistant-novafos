@@ -6,16 +6,23 @@ build-backend = "hatchling.build"
 name = "Novafos"
 
 [tool.pytest.ini_options]
-pythonpath = "."
+testpaths = "tests"
+norecursedirs = ".git"
+asyncio_default_fixture_loop_scope = "function"
+asyncio_mode = "auto"
 addopts = [
-    "--import-mode=importlib",
-]
-asyncio_default_fixture_loop_scope = "class"
+    "-p syrupy",
+    "--strict",
+    "--cov=custom_components",
+    "--import-mode=importlib"
+    ]
+#pythonpath = "custom_components"
+pythonpath = "."
 filterwarnings = [
     'ignore::DeprecationWarning'
 ]
-log_cli_level = "DEBUG"
-log_cli = true
+#log_cli_level = "DEBUG"
+#log_cli = true
 
 # Required modules for testing:
 #

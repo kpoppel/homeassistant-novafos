@@ -27,9 +27,6 @@ async def async_setup_services(hass: HomeAssistant, coordinator: DataUpdateCoord
 		# Update the coordinator data fields.
 		_LOGGER.debug(f"Update via action service call initiated.")
 
-		if coordinator.entry.data['login_method'] != "Token based":
-			_LOGGER.error(f"Service action called, but token based flow is not configured.")
-			return False
 		coordinator.access_token = call.data['access_token']
 		if call.data['access_token_date_updated'] == "":
 			coordinator.access_token_date_updated = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
