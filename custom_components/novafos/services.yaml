@@ -5,7 +5,7 @@ update_token:
       required: true
       example: "ey... long token"
       default: ""
-    access_token:
+    access_token_date_updated:
       required: true
       example: "2024-01-01T12:34:00"
       default: ""
