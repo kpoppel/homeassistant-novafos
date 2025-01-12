@@ -21,13 +21,5 @@ pythonpath = "."
 filterwarnings = [
     'ignore::DeprecationWarning'
 ]
-#log_cli_level = "DEBUG"
-#log_cli = true
-
-# Required modules for testing:
-#
-# pip install pytest pytest-asyncio pytest-mock pytest-regressions
-#
-# Activate venv: source /srv/homeassistant/bin/acivate
-# CD to pynovafos
-# Running: export PYTHONPATH=. && pytest
+log_cli_level = "DEBUG"
+log_cli = true

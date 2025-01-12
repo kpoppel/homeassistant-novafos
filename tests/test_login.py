@@ -1,5 +1,3 @@
-import pytest
-from unittest.mock import AsyncMock, MagicMock
 from datetime import datetime
 import random
 import string
@@ -9,13 +7,21 @@ import requests
 def test_login_using_access_token_too_short(novafos):
     access_token = "too_short"
     access_token_date_updated = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-    assert novafos.authenticate_using_access_token(access_token, access_token_date_updated) == False
+    assert (
+        novafos.authenticate_using_access_token(access_token, access_token_date_updated)
+        is False
+    )
+
 
 def test_login_using_access_token_out_of_date(novafos):
     rand = random.SystemRandom()
-    access_token = ''.join(rand.choices(string.ascii_letters + string.digits, k=1200))
-    access_token_date_updated = datetime(2000,1,1).strftime("%Y-%m-%dT%H:%M:%S")
-    assert novafos.authenticate_using_access_token(access_token, access_token_date_updated) == False
+    access_token = "".join(rand.choices(string.ascii_letters + string.digits, k=1200))
+    access_token_date_updated = datetime(2000, 1, 1).strftime("%Y-%m-%dT%H:%M:%S")
+    assert (
+        novafos.authenticate_using_access_token(access_token, access_token_date_updated)
+        is False
+    )
+
 
 def test_login_using_access_token_ok(mocker, novafos):
     mock_get = mocker.patch("requests.get")
@@ -91,11 +97,13 @@ def test_login_using_access_token_ok(mocker, novafos):
             ]
         }
     ]    
-    """.encode('utf-8')
+    """.encode()
     mock_post.return_value = mock_response
 
     rand = random.SystemRandom()
-    access_token = ''.join(rand.choices(string.ascii_letters + string.digits, k=1200))
+    access_token = "".join(rand.choices(string.ascii_letters + string.digits, k=1200))
     access_token_date_updated = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-    assert novafos.authenticate_using_access_token(access_token, access_token_date_updated) == True
-
+    assert (
+        novafos.authenticate_using_access_token(access_token, access_token_date_updated)
+        is True
+    )

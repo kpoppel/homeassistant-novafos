@@ -26,7 +26,7 @@ The `novafos` component is a Home Assistant custom component for monitoring your
 Fully configurable through config flow.
   1. Head to configuration --> integration
   2. Add new and search for novafos
-  3. Enter email address and pasword as registered with Novafos.
+  3. Enter email address and password as registered with Novafos.
      If you haven't done this before you need to login using NemId/MitId and
      setup email and password first.
   4. Enter the supplier ID as well.  Until a better way to get this automatically is identified, you can get the value from the next section.<br>
@@ -119,7 +119,7 @@ The integration creates the following sensors for water/heating (here water used
 * sensor.novafos_water_statistics_{day|week|month|year} (optional)
   * The total consumption current until the last valid date
 * sensor.novafos_day_total
-  * The total consumtion on the last valid date
+  * The total consumption on the last valid date
   * Attributes contain day data since the first day of the month at the correct dates
 * sensor.novafos_hour_total
   * The hourly consumption on the last valid date. The sensor will return unknown if the valid date is older than 24h
@@ -202,3 +202,17 @@ series:
       entity.attributes.data[0]["Value"]]]
 ```
 
+# Running tests
+If Home Assistant is installed as stand-alone using pip install and a venv:
+
+```
+source /srv/homeassistant/bin/activate
+
+pip install -r requirements.test.txt
+
+cd ~/.homeassistant/custom_componts/homeassistant-novafos
+pre-commit install
+
+cd ~/.homeassistant
+pytest
+```

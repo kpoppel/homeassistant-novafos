@@ -1,5 +1,6 @@
-import pytest
+# import pytest
 import requests
+
 
 def test_get_inactive_meters_water_and_heating(mocker, novafos):
     mock_post = mocker.patch("requests.post")
@@ -38,13 +39,14 @@ def test_get_inactive_meters_water_and_heating(mocker, novafos):
             ]
         }
     ]    
-    """.encode('utf-8')
+    """.encode()
     mock_post.return_value = mock_response
     novafos._get_active_meters()
 
     assert novafos._active_meters == []
     # Depends on this being the first test to run
     assert novafos._meter_data == {}
+
 
 def test_get_active_meters_water_ok(mocker, data_regression, novafos):
     mock_post = mocker.patch("requests.post")
@@ -82,11 +84,12 @@ def test_get_active_meters_water_ok(mocker, data_regression, novafos):
             ]
         }
     ]    
-    """.encode('utf-8')
+    """.encode()
     mock_post.return_value = mock_response
     novafos._get_active_meters()
     # On first run create a yaml file with data from the data structure. Subsequently check against this file.
     data_regression.check(novafos._active_meters)
+
 
 def test_get_active_meters_heating_ok(mocker, data_regression, novafos):
     mock_post = mocker.patch("requests.post")
@@ -124,13 +127,14 @@ def test_get_active_meters_heating_ok(mocker, data_regression, novafos):
             ]
         }
     ]    
-    """.encode('utf-8')
+    """.encode()
     mock_post.return_value = mock_response
     novafos._get_active_meters()
     # On first run create a yaml file with data from the data structure. Subsequently check against this file.
     data_regression.check(novafos._active_meters)
 
-#@pytest.mark.skip(reason="Need some data to test what is necessary here.")
+
+# @pytest.mark.skip(reason="Need some data to test what is necessary here.")
 def test_get_active_meters_water_and_heating_ok(mocker, data_regression, novafos):
     mock_post = mocker.patch("requests.post")
     mock_response = requests.Response()
@@ -168,11 +172,12 @@ def test_get_active_meters_water_and_heating_ok(mocker, data_regression, novafos
             ]
         }
     ]    
-    """.encode('utf-8')
+    """.encode()
     mock_post.return_value = mock_response
     novafos._get_active_meters()
     # On first run create a yaml file with data from the data structure. Subsequently check against this file.
     data_regression.check(novafos._active_meters)
+
 
 def test_get_meter_types(mocker, data_regression, novafos):
     novafos._active_meters = "Return me"
