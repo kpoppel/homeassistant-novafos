@@ -39,7 +39,7 @@ async def async_setup_services(hass: HomeAssistant, coordinator: DataUpdateCoord
                 "access_token_date_updated"
             ]
         # Then call the coordinator to update itself.
-        # await coordinator.async_refresh()
+        await coordinator.async_refresh()
 
     # Add service to receive a login token
     hass.services.async_register(
