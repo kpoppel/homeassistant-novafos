@@ -328,9 +328,14 @@ class Novafos:
 
     def _local_to_utc(self, local_time):
         """Convert a local time to UTC time including timezone and summer(DST)/winter time offsets."""
-        local_time_with_timezone = local_time.astimezone(self.tz)
-        utc_offset = local_time_with_timezone.utcoffset()
-        return local_time.astimezone(ZoneInfo("UTC")) - utc_offset
+        return local_time.astimezone(ZoneInfo("UTC"))
+        # TODO: Find out what is going on here.  If the system time is UTC, the lines below does what is correct.
+        #       If the system time is CET or Europe/Copenhagen, the line above works.
+        #
+        #
+        # local_time_with_timezone = local_time.astimezone(self.tz)
+        # utc_offset = local_time_with_timezone.utcoffset()
+        # return local_time.astimezone(ZoneInfo("UTC")) - utc_offset
 
     def _local_str_to_utc_str(self, local_time_str):
         """Convert a local ISO time string to UTC time strimg."""
