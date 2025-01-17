@@ -27,9 +27,9 @@ class Novafos:
     Primary exported interface for KMD API wrapper.
     """
 
-    def __init__(self):
+    def __init__(self, timezone):
         self._api_url = "https://easy-energy-plugin-api.kmd.dk"
-        self.tz = ZoneInfo("Europe/Copenhagen")
+        self.tz = ZoneInfo(timezone)
 
         self._access_token = ""
         self._customer_id = ""

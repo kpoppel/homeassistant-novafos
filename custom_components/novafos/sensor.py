@@ -86,7 +86,23 @@ class NovafosWaterSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return extra state attributes."""
+        """Return extra state attributes.
+        Attributes could include the last total yearly consumption.
+        This value may be used in a template sensor which can in turn be
+        used in the energy dashboard.
+        TODO: If yearly values should be included it is probably a good idea
+              to just make that one extra REST API call and the the latest
+              year total.  Alternately the sum of all hours since start-of-year
+              is to be calculated on every fetch. That is many data points
+              at the end of the year.
+        """
+        # if self.entity_description.key == "statistics":
+        #     self._attrs["year_total"] = self.coordinator.data[self.entity_description.sensor_type][self.entity_description.key]["year_total"]
+        #     self._attrs["last_valid_date"] = self.coordinator.data[self.entity_description.sensor_type][self.entity_description.key]["LastValidDate"]
+        # else:
+        #     self._attrs = {}
+        # return self._attrs
+
         self._attrs = {}
 
     @property

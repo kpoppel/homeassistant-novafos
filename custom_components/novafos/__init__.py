@@ -46,7 +46,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.debug(f"Novafos ConfigData: {entry.data}")
 
     # Use the coordinator which handles regular fetch of API data.
-    api = Novafos()
+    api = Novafos(time_zone=hass.config.time_zone)
     coordinator = NovafosUpdateCoordinator(hass, api, entry)
     # If you do not want to retry setup on failure, use
     await coordinator.async_refresh()

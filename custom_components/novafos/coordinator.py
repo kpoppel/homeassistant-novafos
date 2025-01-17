@@ -51,6 +51,8 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
         self.api = api
         self.hass = hass
         self.entry = entry
+        # Attribute data for the sensors
+        self.attrib_data = {"year_total": None}
         # Need local version here to enable updating via action service calls
         self.access_token = (
             self.entry.options["access_token"]
@@ -86,7 +88,8 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
             try:
                 _LOGGER.debug("Getting latest statistics")
                 await self._insert_statistics(debug)
-                await self._insert_grouped_statistics(debug)
+                if self.entry.data["use_grouped_sensors"]:
+                    await self._insert_grouped_statistics(debug)
                 data = self.api._meter_data
             except Exception as ex:
                 raise UpdateFailed(f"The service is unavailable: {ex}")
@@ -101,7 +104,7 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
         """Update statistics when data is returned"""
         # Iterate over water/heating
         # _get_meter_types returns:
-        #      [{'type': 'water', 'InstallationId': 16496761, 'MeasurementPointId': 16639137, 'Unit': {'Id': 10319, 'Name': 'm³', 'Description': 'Vand', 'Decimals': 0, 'Order': 1}}]
+        #      [{'type': 'water', 'InstallationId': 12345678, 'MeasurementPointId': 23456789, 'Unit': {'Id': 11111, 'Name': 'm³', 'Description': 'Vand', 'Decimals': 0, 'Order': 1}}]
         for meter_device in self.api.get_meter_types():
             meter_type = meter_device["type"]
             _LOGGER.debug("Retrieving statistics data for %s meter.", meter_type)
@@ -246,13 +249,15 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
             )
             async_import_statistics(self.hass, metadata, statistics)
 
-    async def _insert_grouped_statistics(self, debug) -> None:
+    async def _insert_grouped_statistics(
+        self, grouping=("day", "week", "month", "year"), debug=False
+    ) -> None:
         """Update statistics when data is returned"""
         # Iterate over water/heating
         # _get_meter_types returns:
-        #      [{'type': 'water', 'InstallationId': 16496761, 'MeasurementPointId': 16639137, 'Unit': {'Id': 10319, 'Name': 'm³', 'Description': 'Vand', 'Decimals': 0, 'Order': 1}}]
+        #      [{'type': 'water', 'InstallationId': 11223344, 'MeasurementPointId': 33445566, 'Unit': {'Id': 10319, 'Name': 'm³', 'Description': 'Vand', 'Decimals': 0, 'Order': 1}}]
         for meter_device in self.api.get_meter_types():
-            for grouping in ["day", "week", "month", "year"]:
+            for grouping in grouping:
                 meter_type = meter_device["type"]
                 _LOGGER.debug(
                     "Generating grouped statistics data for %s meter for %s.",
