@@ -417,6 +417,55 @@ class Novafos:
         #    'heating': [{'DateFrom: <date>, 'Value': <float>}, ...],}
         return self._meter_data
 
+    def get_year_data(self):
+        """
+        Retrieve statistics for the full year from the API.
+
+        from_date is a datetime object with the date in local time from which to start retrieving data.  All days until present day will be retrieved.
+
+        Returns:
+          { 'type': 'water',
+            'Data': [{'DateFrom': '2025-01-01T00:00:00', 'Value': 6.288}],
+            'Extra': {
+               'Sum': 6.288, 'Avg': 0.0, 'Max': 0.0, 'Min': 0.0, 'LastValidDate': '2025-12-31T23:59:59'
+            }
+          }
+        """
+        # Calculate date range to process - clean time settings too
+        from_date_input = datetime.now().replace(
+            month=1, day=1, hour=0, minute=0, second=0, microsecond=0
+        )
+        end_date_input = datetime.now().replace(
+            month=12, day=31, hour=23, minute=59, second=59, microsecond=0
+        )
+        dateFrom = self._utc_to_isostr(self._local_to_utc(from_date_input))
+        dateTo = self._utc_to_isostr(self._local_to_utc(end_date_input))
+
+        _LOGGER.debug(
+            f"Statistics year range to fetch: {from_date_input}-{end_date_input}"
+        )
+
+        time_series = self._get_all_consumption_timeseries(
+            dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level["Year"]
+        )
+
+        meter_year_data = {}
+        for series in time_series:
+            type = series.pop("type")
+            meter_year_data[type] = series
+
+            if self._last_valid_day:
+                meter_year_data[type]["LastValidDate"] = self._last_valid_day
+
+            if series["Data"]:
+                _LOGGER.debug(f"Year Total for {type}: {series}")
+                _LOGGER.debug(json.dumps(time_series, sort_keys=False, indent=4))
+            else:
+                _LOGGER.warning(
+                    "The KMD API returned no yearly data.  Expect sensors to signal 'unavailable'"
+                )
+        return meter_year_data
+
     def group_by_day(self, meter_type):
         """
         Groups the input data into buckets of 24 hourly measurements per day.

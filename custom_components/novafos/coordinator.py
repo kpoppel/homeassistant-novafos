@@ -79,22 +79,28 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
         #     self.api._meter_data = get_year_sample_data()
         #     self.api._meter_data_extra = get_year_sample_data_extra()
 
+        meter_year_data = None
         if await self.hass.async_add_executor_job(
             self.api.authenticate_using_access_token,
             self.access_token,
             self.access_token_date_updated,
         ):
             # Retrieve latest data from the API
+            # if True:
             try:
                 _LOGGER.debug("Getting latest statistics")
-                await self._insert_statistics(debug)
+                meter_year_data = await self.hass.async_add_executor_job(
+                    self.api.get_year_data
+                )
+                # last_state = await self._insert_statistics(debug=debug)
+                await self._insert_statistics(debug=debug)
                 if self.entry.data["use_grouped_sensors"]:
-                    await self._insert_grouped_statistics(debug)
-                data = self.api._meter_data
+                    await self._insert_grouped_statistics(debug=debug)
+                data = (self.api._meter_data, meter_year_data)  # , last_state)
             except Exception as ex:
                 raise UpdateFailed(f"The service is unavailable: {ex}")
         else:
-            data = self.api.get_dummy_data()
+            data = (self.api.get_dummy_data(), meter_year_data)  # , None)
 
         # The data is stored in the coordinator as a .data field.
         _LOGGER.debug("Returning from Coordinator with data: %s", data)
@@ -248,6 +254,9 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                 unit_of_measurement=unit,
             )
             async_import_statistics(self.hass, metadata, statistics)
+
+            # Could return last state for a sensor - but the sensor state ruins the statistics.
+            # return statistics[-1]['state']
 
     async def _insert_grouped_statistics(
         self, grouping=("day", "week", "month", "year"), debug=False

@@ -45,14 +45,16 @@ async def async_setup_entry(
     # The sensors are defined in the const.py file
     sensors: list[NovafosWaterSensor] = []
     # The coordinator data is already populated and this means it is possible to 'auto-discover' which sensors to create:
-    if "water" in coordinator.data:
+    if "water" in coordinator.data[0]:
         for description in WATER_SENSOR_TYPES:
             sensors.append(NovafosWaterSensor(name, coordinator, description))
+            # _LOGGER.debug("Adding Novafos sensor %s", description.name)
         if config.data["use_grouped_sensors"]:
             for description in EXTRA_WATER_SENSOR_TYPES:
                 sensors.append(NovafosWaterSensor(name, coordinator, description))
+                # _LOGGER.debug("Adding Novafos sensor %s", description.name)
 
-    if "heating" in coordinator.data:
+    if "heating" in coordinator.data[0]:
         for description in HEATING_SENSOR_TYPES:
             sensors.append(NovafosWaterSensor(name, coordinator, description))
         if config.data["use_grouped_sensors"]:
@@ -82,7 +84,7 @@ class NovafosWaterSensor(CoordinatorEntity, SensorEntity):
             f"{name.lower()}-{description.sensor_type}-{description.key}"
         )
 
-        # Note: Data is stored in self.coordinator.data[self.entity_description.key]
+        # Note: Data is stored in self.coordinator.data
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -96,17 +98,24 @@ class NovafosWaterSensor(CoordinatorEntity, SensorEntity):
               is to be calculated on every fetch. That is many data points
               at the end of the year.
         """
-        # if self.entity_description.key == "statistics":
-        #     self._attrs["year_total"] = self.coordinator.data[self.entity_description.sensor_type][self.entity_description.key]["year_total"]
+        _LOGGER.debug(self.coordinator.data)
+        if (
+            self.entity_description.key == "statistics"
+            and self.coordinator.data[1] is not None
+        ):
+            self._attrs["year_total"] = self.coordinator.data[1][
+                self.entity_description.sensor_type
+            ]["Data"][-1]["Value"]
         #     self._attrs["last_valid_date"] = self.coordinator.data[self.entity_description.sensor_type][self.entity_description.key]["LastValidDate"]
-        # else:
-        #     self._attrs = {}
-        # return self._attrs
+        else:
+            self._attrs = {}
+        return self._attrs
 
-        self._attrs = {}
+        # self._attrs = {}
 
     @property
     def native_value(self) -> StateType:
         # State needs to be unknown as the data is in the past and not a current measurement.
         # If a state is set, this will go to the statistics too and make things look funny.
+        # return self.coordinator.data[2]
         return None
