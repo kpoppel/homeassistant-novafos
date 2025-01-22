@@ -287,7 +287,7 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                 statistics = []
 
                 # Populate statistics array
-                for date, _sum, _change, _max, _min, _mean in dataset:
+                for date, _sum, _change, _min, _max, _mean in dataset:
                     # Add timezone to dataset as Home Assistant works in UTC
                     from_time = dt_util.parse_datetime(date).replace(
                         tzinfo=dt_util.get_time_zone(self.hass.config.time_zone)

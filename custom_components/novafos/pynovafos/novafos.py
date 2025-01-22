@@ -479,11 +479,11 @@ class Novafos:
             A dictionary where keys are dates in the format "YYYY-MM-DD"
             and values are lists of tuples representing hourly measurements
             for that day.
-            The returned data is (date, sum, change, max, min, mean)
+            The returned data is (date, sum, change, min, max, mean)
             sum = sum of consumption for all 24 hours
             change = change of sum since yesterday
-            max = max value of the hourly data
             min = min value of the hourly data
+            max = max value of the hourly data
             mean = mean value of the hourly data
         """
         daily_data = {}
