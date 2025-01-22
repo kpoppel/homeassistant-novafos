@@ -8,7 +8,7 @@ import sys
 def novafos():
     """Fixture to provide a single instance of Novafos for all tests in the module."""
     print("Setting up Novafos instance")
-    instance = Novafos()
+    instance = Novafos(timezone="Europe/Copenhagen")
     yield instance  # Yield instance to the tests
     print("\nTearing down Novafos instance")
 
