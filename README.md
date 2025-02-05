@@ -42,6 +42,7 @@ Fully configurable through config flow.
 | Frederikssund | 0642000     |
 | Gentofte      | 0676000     |
 | Gladsaxe      | 0676000     |
+| Glostrup      | 0364005     |
 | Hørsholm      | 0398000     |
 | Rudersdal     | 0642000     |
 
