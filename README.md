@@ -43,7 +43,7 @@ Check this repository: https://github.com/kpoppel/homeassistant-novafos-chrome-a
 Unfortunately Novafos and KMD "Easy-Energy" does not care anything about secure machine-usable access to their customer's
 data, except through their own services, like the website, and the proprietary Watts app.
 
-The extension used to be able to login using OICD (which is prett safe, right), or email/password combination, but through
+The extension used to be able to login using OICD (which is pretty safe, right), or email/password combination, but through
 the introduction of reCAPTCHA, this is no longer possible to automate.  This is the reason the extension relies on
 a human login, after which the rest can be automated.
 
@@ -68,7 +68,7 @@ Install the Chrome extension from this Github repository: https://github.com/kpo
 README file in that place for the details. The extension automates scraping the token and sending it to Home Assistant.
 Note you have to setup Home Assistant to be accessible through HTTPS.
 
-## Method 2: Login on website and manuallt find and copy token to Home Assistant
+## Method 2: Login on website and manually find and copy token to Home Assistant
 
 This method is 100% manual, but will ensure you get data into Home Assistant regardless.  Why would you do this then?
 Well I cannot say, but maybe doing this once per week or month is a good way to keep tabs on consumption or dripping
