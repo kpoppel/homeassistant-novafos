@@ -28,7 +28,7 @@ Fully configurable through config flow.
   1. Head to configuration --> integration
   2. Add new and search for Novafos
   3. Enter your name for the sensors, default is "Novafos", but if you have more, go ahead and change it.
-  4. If you want extr sensors with statistics for grouped data by day, week, month, and year, check this box.
+  4. If you want extra sensors with statistics for grouped data by day, week, month, and year, check this box.
   5. Enter a working access token to get started.  This will pre-load statistics 1 calendar year back in time.
      You can enter some random text to create the sensors without the pre-load of data.
 
