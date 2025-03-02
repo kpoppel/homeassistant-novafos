@@ -1,309 +1,189 @@
-'''
+"""
 Primary public module for novafos.dk API wrapper.
-'''
+"""
+
 from __future__ import annotations
 
 from datetime import datetime
 from datetime import timedelta
+from zoneinfo import ZoneInfo
 import logging
 import json
 import requests
-import hashlib
-import re
-import string
-import random
-import base64
-import uuid
 
 _LOGGER = logging.getLogger(__name__)
 
+
 class LoginFailed(Exception):
-    """"Exception class for bad credentials"""
+    """ "Exception class for bad credentials"""
+
 
 class HTTPFailed(Exception):
     """Exception class for API HTTP failures"""
 
+
 class Novafos:
-    '''
+    """
     Primary exported interface for KMD API wrapper.
-    '''
-    def __init__(self, username, password, supplierid):
-        self._username = username
-        self._password = password
-        self._supplierid = supplierid
+    """
+
+    def __init__(self, timezone):
         self._api_url = "https://easy-energy-plugin-api.kmd.dk"
+        self.tz = ZoneInfo(timezone)
 
         self._access_token = ""
         self._customer_id = ""
         self._customer_number = ""
         self._active_meters = []
         self._meter_data = {}
+        self._meter_data_extra = {}
+        self._meter_data_grouped = {}
         self._last_valid_day = None
 
         # NOTE: Added because of reCAPCTHA login screen
         self._access_token_date_updated = ""
 
-        # TODO: Add docker host config here instead of directly on the authentication function.
-        # ...
-
         # Zoom level is the granuarity of the retrieved data
-        self._zoom_level = {
-         "Year"    : 0,
-         "Month"   : 1,
-         "Day"     : 2,
-         "Hour"    : 3,
-         "Billing" : 4
-        }
+        self._zoom_level = {"Year": 0, "Month": 1, "Day": 2, "Hour": 3, "Billing": 4}
 
     def _print_json(self, map, context="JSON dump"):
-        _LOGGER.debug("%s:\n %s", context, json.dumps(map, indent=4, sort_keys=True, ensure_ascii=False))
-
-    def _generate_random_string(self, size):
-        rand = random.SystemRandom()
-        return ''.join(rand.choices(string.ascii_letters + string.digits, k=size))
-
-    def _generate_code(self) -> tuple[str, str]:
-        rand = random.SystemRandom()
-        code_verifier = ''.join(rand.choices(string.ascii_letters + string.digits, k=67))
-
-        code_sha_256 = hashlib.sha256(code_verifier.encode('utf-8')).digest()
-        b64 = base64.urlsafe_b64encode(code_sha_256)
-        code_challenge = b64.decode('utf-8').replace('=', '')
-
-        return (code_verifier, code_challenge)
-
-    def authenticate_using_selenium(self, selenium_host_url):
-        """ This function relies on a remote browser controlled by selenium.  While the recaptcha will eventually
-            figure out this is an automated login, it might just work most of the time.
-            The code varies the time from data is entered (as a password manager vould do) to the point where
-            <ENTER> is 'pressed'.
-            If using selenium/standalone-firefox, access the VNC terminal to check up on things.
-        """
-        self._access_token_date_updated = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-        data = {
-             "username": self._username,
-             "password": self._password,
-             "supplierid": self._supplierid[0:3]
-        }
-        # The selenium response is copying the reponse from the oidc endpoint.
-        response = requests.post(selenium_host_url, json=data)
-        try:
-            response_dict = json.loads(response.json())
-            if response_dict['access_token'] == "":
-                _LOGGER.error('Failed to retrieve bearer token (maybe you are a robot?)')
-                self._access_token = ""
-                return False
-            self._access_token = f"{response_dict['token_type']} {response_dict['access_token']}"
-            _LOGGER.debug('Got bearer token (access to API was Ok) valid for %ss: %s', response_dict['expires_in'], self._access_token)
-            return True
-        except:
-            _LOGGER.error('Failed to retrieve bearer token (no JSON returned)')
-            return False
+        _LOGGER.debug(
+            "%s:\n %s",
+            context,
+            json.dumps(map, indent=4, sort_keys=True, ensure_ascii=False),
+        )
 
     def authenticate_using_access_token(self, access_token, access_token_date_updated):
-        """ The only reason for this function is due to to a reCAPTCHA challenge on the Novafos login page.
-            The date is used to verify the token is not too old when getting data.
+        """The only reason for this function is due to to a reCAPTCHA challenge on the Novafos login page.
+        The date is used to verify the token is not too old when getting data.
         """
         self._access_token_date_updated = access_token_date_updated
         # Make a simple validation of the access_token length and only update if it has the correct length
         if len(access_token) >= 1200:
-            self._access_token = "Bearer "+access_token
+            self._access_token = "Bearer " + access_token
         else:
             self._access_token = ""
-            _LOGGER.error(f"Token update does not seem to have a valid length. Please check again. (This message is normal the first time the integration starts)")
+            _LOGGER.error(
+                "Token update does not seem to have a valid length. Please check again. (This message is normal the first time the integration starts)"
+            )
             return False
-        _LOGGER.debug("Access token set to: '%s' at date: '%s'", self._access_token, self._access_token_date_updated)
-        return True
+        _LOGGER.debug(
+            "Access token set to: '%s' at date: '%s'",
+            self._access_token,
+            self._access_token_date_updated,
+        )
 
-    def authenticate(self):
-        """
-        The OIDC login procedure automated.
-        Use the username/password/supplierid credentials to login and get a code token from which to retrieve the Bearer token.
-        """
-        nonce = self._generate_random_string(size=42)
-        state = self._generate_random_string(size=42)
-        code_verifier, code_challenge = self._generate_code()
-        # Tokens generated during the handshake:
-        request_verification_token = None
-        code = None
-
-        # ID determined between Novafos and the OIDC service at KMD
-        client_id = '1DA5CFAF-F67F-4DA1-A1A6-513A7768F994'
-        # Our identification - generate e new one everytime we update data
-        app = uuid.uuid4()
-
-        # The capabilities of the OIDC service can be fetched here:
-        # https://easy-energy-identity.kmd.dk/.well-known/openid-configuration
-        # This is useful for a dynamic setup where different services must be contacted.
-        # Here we know which one and how to do it.
-
-        # The first step is to actually load the login webpage.  KMD made sure to include a hidden form value
-        # probably to ensure the one who submits the form is also the one who loaded it in the first place.
-        ######################
-        # A session is needed for the login part as cookies are exchanged as well.
-        session = requests.Session()
-
-        headers = {}
-
-        params = {
-            'ReturnUrl': f'/oidc/authorize?client_id={client_id}&redirect_uri=https%3A%2F%2Fminforsyning-2.kmd.dk%2Flogin&response_type=code&scope=openid%20profile%20pluginapi_int&nonce={nonce}&state={state}&code_challenge={code_challenge}&code_challenge_method=S256&utility={self._supplierid}&login_type=mf&post_logout_redirect_uri=https%3A%2F%2Fminforsyning-2.kmd.dk%2Flogin&app={app}',
-        }
-
-        response = session.get('https://easy-energy-identity.kmd.dk/Identity/Account/Sign/Login', params=params, headers=headers)
-
-        # Get the 'RequestVerificationToken' out of response TEXT:
-        #<input name="__RequestVerificationToken" type="hidden" value="CfDJ8BtjbcM0azZLgmK58SCaJRwb4UK7iGEmt5ENx8EhXvgpt3GFKIwLR4svDgNa0sHp9mNOemf4df0IYV25vmqQD-QFI7Dh7sVcM-D5U-smZpjnu7xajAQEHWx-fT_pzj-jXhOskLj4G22355Z2JysR_tM" /></
-        # It is always 155 characters as well it seems..
-        # If this code is not present, authentication will fail.
-        rvt = re.search(r'(?<=__RequestVerificationToken" type="hidden" value=")([\w-]+)', response.text)
-        request_verification_token = rvt.group(0)
-        _LOGGER.debug('Got login form request_verification_token = %s', request_verification_token)
-
-        # Second step is to submit the login form with the username and password.
-        # In the response from the server we get a secret code to be used later
-        ######################
-        headers = {
-            'content-type': 'application/x-www-form-urlencoded',
-        }
-
-        params = {
-            'returnUrl': f'/oidc/authorize?client_id={client_id}&redirect_uri=https%3A%2F%2Fminforsyning-2.kmd.dk%2Flogin&response_type=code&scope=openid%20profile%20pluginapi_int&nonce={nonce}&state={state}&code_challenge={code_challenge}&code_challenge_method=S256&utility={self._supplierid}&login_type=mf&post_logout_redirect_uri=https%3A%2F%2Fminforsyning-2.kmd.dk%2Flogin&app={app}',
-        }
-
-        data = f'Input.Email={self._username}&Input.Password={self._password}&__RequestVerificationToken={request_verification_token}'
-
-        response = session.post('https://easy-energy-identity.kmd.dk/Identity/Account/Sign/Login', params=params, headers=headers, data=data)
-
-        # At this point user/password should have been accepted. (if "forkert" is in text then login did not succeed)
-
-        # url field contains the next code we need.
-        #  https://minforsyning-2.kmd.dk/login?code=0gRigEdqZKwcB_fdPqaiW3t410UrXLXXEC-eT6vrXuw&state=b%27SP0DKBBZ5YX4L8W4S70E08SD2Q5MSUOIHC05W90D0Y%27
-        code = response.url[41:84]
-
-        # Something is wrong if the code contains the word "Account".  Too many wrong login attempts causes account lockout condition
-        if "Account" in code:
-            raise LoginFailed('Code not retrieved correctly. Plugin will not continue login process.  Check user/pass/supplierID')
-        if "Lockout" in code:
-            raise('The Novafos account is subject to lockout due to too many failed login attempts. You may be subject to a 30 min lockout.')
-
-        _LOGGER.debug('Got one-time session code (supplierid and user/pass was ok): %s', code)
-
-        # Third step is to use the code from the authentication service to verify we are the right one
-        # The correct code and the state issued from the beginning must be correct.
-        # Interestingly enough it seems this step can be omitted entirely - keeping it anyway.
-        #####################
-        headers = {}
-
-        params = {
-            'code': code,
-            'state': state,
-        }
-
-        response = requests.get('https://minforsyning-2.kmd.dk/login', params=params, headers=headers)
-
-        # Finally the Bearer token can be retrieved from the oicd token endpoint.
-        # The code is reused to verify we can get the token.
-        #####################
-        headers = {}
-
-        data = {
-            'grant_type': 'authorization_code',
-            'client_id': client_id,
-            'code_verifier': code_verifier, 
-            'code': code,
-            'redirect_uri': 'https://minforsyning-2.kmd.dk/login',
-        }
-
-        response = requests.post('https://easy-energy-identity.kmd.dk/oidc/token', headers=headers, data=data)
-        self._access_token = f"{response.json()['token_type']} {response.json()['access_token']}"
-
-        _LOGGER.debug(f'Got bearer token (access to API was Ok) valid for %ss: %s', response.json()['expires_in'], self._access_token)
-
-        return True
+        # Check token age
+        now = datetime.now()
+        # Allow 45 minutes since the last token update.  If updating after this point, disallow API accesses.
+        if (
+            self._access_token == ""
+            or datetime.strptime(self._access_token_date_updated, "%Y-%m-%dT%H:%M:%S")
+            + timedelta(minutes=45)
+            < now
+        ):
+            _LOGGER.debug(
+                "Access_token too old or not set correctly while authenticating"
+            )
+            return False
+        else:
+            # Configure other data necessary for fetching data
+            self._get_customer_id()
+            self._get_active_meters()
+            return True
 
     def _get_customer_id(self):
         # Need to retrieve the customer ID from the user profile to fetch data.
         headers = {
-            'Authorization': self._access_token,
+            "Authorization": self._access_token,
         }
 
-        url = f'{self._api_url}/api/profile/get'
+        url = f"{self._api_url}/api/profile/get"
 
-        response = requests.get(url, headers=headers)        
-        #self._print_json(response.json(), "Retrieved customer ID JSON response")
+        response = requests.get(url, headers=headers)
+        # self._print_json(response.json(), "Retrieved customer ID JSON response")
         self._customer_id = f"{response.json()['Customers'][0]['Id']}"
         self._customer_number = f"{response.json()['Customers'][0]['Number']}"
-        _LOGGER.debug("Retrieved customer_id, number: %s, %s", self._customer_id, self._customer_number)
+        _LOGGER.debug(
+            "Retrieved customer_id, number: %s, %s",
+            self._customer_id,
+            self._customer_number,
+        )
 
     def _get_active_meters(self):
         """
         The returned data is a list of installations:
         [{'InstallationPeriodId': <int>,
           'InstallationId': <int>,     <--- this one is important
-          'LocationId': <int>, 
-          'Location': '<str>', 
+          'LocationId': <int>,
+          'Location': '<str>',
           'MeasurementPointId': <int>,  <--- this one is important
-          'MeasurementPointType': '', 
-          'MeasurementPointNumber': '<str>', 
+          'MeasurementPointType': '',
+          'MeasurementPointNumber': '<str>',
           'MeterId': <int>,
           'ConsumptionTypeId': 6,          <--- '6'=water, '5'=heating
           'ConsumptionTypeName': 'Vand',   <--- might want to ensure we are looking at water too
-          'IsRemoteRead': True, 
+          'IsRemoteRead': True,
           'IsActive': True,                <--- Check this one for True
-          'MeterNumber': '<int>', 
-          'MeterTypeId': <int>, 
-          'MeasurementPointTypeCodeText': '', 
+          'MeterNumber': '<int>',
+          'MeterTypeId': <int>,
+          'MeasurementPointTypeCodeText': '',
           'Units': [{'Id': <int>,          <-- need to save this dict as well, Id as minimum
-                     'Name': 'm³', 
+                     'Name': 'm³',
                      'Description': 'Vand',
-                     'Decimals': 0, 
+                     'Decimals': 0,
                      'Order': 1
                     }]
         }]
         """
         headers = {
-            'Customer-Id': self._customer_id,
-            'Customer-Number': self._customer_number,
-            "Authorization" : self._access_token
+            "Customer-Id": self._customer_id,
+            "Customer-Number": self._customer_number,
+            "Authorization": self._access_token,
         }
 
-        data = {
-            "IncludeUnits":"true"
-        }
+        data = {"IncludeUnits": "true"}
 
         url = f"{self._api_url}/api/meter/customerActiveMeters"
 
         response = requests.post(url, data=data, headers=headers)
         # NOTE: Failure may happen right here whenever the API is updated with new headers and what not.
-        #self._print_json(response.json(), "Get active meters response")
+        # self._print_json(response.json(), "Get active meters response")
 
         response_json = response.json()
         self._active_meters = []
         for meter in response_json:
             """ Pick up active water measuring meters """
-            if meter["IsActive"] == True and meter["ConsumptionTypeId"] == 6:
+            if meter["IsActive"] and meter["ConsumptionTypeId"] == 6:
                 # Water type
                 active = {
                     "type": "water",
-                    "InstallationId" : meter["InstallationId"],
-                    "MeasurementPointId" : meter["MeasurementPointId"],
-                    "Unit" : meter["Units"][0],
+                    "InstallationId": meter["InstallationId"],
+                    "MeasurementPointId": meter["MeasurementPointId"],
+                    "Unit": meter["Units"][0],
                 }
-                self._meter_data['water'] = {}
+                self._meter_data["water"] = []
+                self._meter_data_extra["water"] = []
                 self._active_meters.append(active)
-            if meter["IsActive"] == True and meter["ConsumptionTypeId"] == 5:
+            if meter["IsActive"] and meter["ConsumptionTypeId"] == 5:
                 # Heating type
                 active = {
                     "type": "heating",
-                    "InstallationId" : meter["InstallationId"],
-                    "MeasurementPointId" : meter["MeasurementPointId"],
-                    "Unit" : meter["Units"][0],
+                    "InstallationId": meter["InstallationId"],
+                    "MeasurementPointId": meter["MeasurementPointId"],
+                    "Unit": meter["Units"][0],
                 }
-                self._meter_data['heating'] = {}
+                self._meter_data["heating"] = []
+                self._meter_data_extra["heating"] = []
                 self._active_meters.append(active)
-        _LOGGER.debug('Got active (water/heating) meters : %s', self._active_meters)
+        _LOGGER.debug("Got active (water/heating) meters : %s", self._active_meters)
 
-    def _get_consumption_timeseries(self, metering_device, dateFrom, dateTo, zoomLevel = 0):
+    def get_meter_types(self):
+        return self._active_meters
+
+    def _get_consumption_timeseries(
+        self, metering_device, dateFrom, dateTo, zoomLevel=0
+    ):
         """Get the timeseries as requested for a single metering device, based on zoom level and date range.
 
         Zoomlevel:
@@ -314,54 +194,54 @@ class Novafos:
          4 : Billing Period
 
          Example:
-         {'SheetName': None, 
+         {'SheetName': None,
           'Series': [
             {'Data': [
-                {'DateFrom': '2022-01-10T00:00:00+01:00', 
-                 'DateTo': '2022-01-10T23:59:59+01:00', 
+                {'DateFrom': '2022-01-10T00:00:00+01:00',
+                 'DateTo': '2022-01-10T23:59:59+01:00',
                  'Value': 0.344,  <--- has accurate measurement registered
-                 'UnitName': 'm³', 
-                 'Label': '', 
+                 'UnitName': 'm³',
+                 'Label': '',
                  'IsComplete': True, <--- this one is complete
                  'IsSettlement': False
                 },
-                {'DateFrom': '2022-01-11T00:00:00+01:00', 
-                 'DateTo': '2022-01-11T23:59:59+01:00', 
+                {'DateFrom': '2022-01-11T00:00:00+01:00',
+                 'DateTo': '2022-01-11T23:59:59+01:00',
                  'Value': 0.01,   <--- has one measurement registered
-                 'UnitName': 'm³', 
-                 'Label': '', 
-                 'IsComplete': False,  <--- but is incomplete!
+                 'UnitName': 'm³',
+                 'Label': '',
+                 'IsComplete': False,  <--- but is incomplete!  This is ignored in the web interface. Data is displayed regardless.
                  'IsSettlement': False
                 },
                 {'DateFrom': '2022-01-12T00:00:00+01:00',
-                 'DateTo': '2022-01-12T23:59:59+01:00', 
+                 'DateTo': '2022-01-12T23:59:59+01:00',
                  'Value': 0.0,   <--- no measurements
-                 'UnitName': 'm³', 
-                 'Label': '', 
-                 'IsComplete': False,  <--- and incomplete
+                 'UnitName': 'm³',
+                 'Label': '',
+                 'IsComplete': False,  <--- and incomplete.  This is ignored in the web interface. Data is displayed regardless.
                  'IsSettlement': False
                 }],
              'Label': None
             }
          ],
          'Total': {
-             'Value': 0.354, 
-             'DateFrom': '2022-01-10T01:00:00+01:00', 
+             'Value': 0.354,
+             'DateFrom': '2022-01-10T01:00:00+01:00',
              'DateTo': '2022-01-15T00:00:00+01:00'
-             }, 
+             },
          'Average': {
-             'Value': 0.344, 
-             'DateFrom': '2022-01-10T00:00:00+01:00', 
+             'Value': 0.344,
+             'DateFrom': '2022-01-10T00:00:00+01:00',
              'DateTo': '2022-01-10T23:59:59+01:00'
-             }, 
+             },
          'Maximum': {
-             'Value': 0.344, 
-             'DateFrom': '2022-01-10T00:00:00+01:00', 
+             'Value': 0.344,
+             'DateFrom': '2022-01-10T00:00:00+01:00',
              'DateTo': '2022-01-10T23:59:59+01:00'
              },
          'Minimum': {
-             'Value': 0.344, 
-             'DateFrom': '2022-01-10T00:00:00+01:00', 
+             'Value': 0.344,
+             'DateFrom': '2022-01-10T00:00:00+01:00',
              'DateTo': '2022-01-10T23:59:59+01:00'
              }
         }
@@ -382,9 +262,9 @@ class Novafos:
         ]
         """
         headers = {
-            'Customer-Id': self._customer_id,
-            'Customer-Number': self._customer_number,
-            "Authorization" : self._access_token
+            "Customer-Id": self._customer_id,
+            "Customer-Number": self._customer_number,
+            "Authorization": self._access_token,
         }
 
         # Setup query parameters for the API.
@@ -394,7 +274,8 @@ class Novafos:
             "MeasurementPointId": metering_device["MeasurementPointId"],
             "Unit": metering_device["Unit"],
             "ZoomLevel": zoomLevel,
-            "PriceData":"false", #optional
+            "PriceData": "false",  # optional
+            "Interval": "PT1H",
             "DateFrom": dateFrom,
             "DateTo": dateTo,
         }
@@ -407,252 +288,438 @@ class Novafos:
         # Enable logging DEBUG to see all returned data from the API:
         self._print_json(result_json, "Retrieved timeseries JSON response")
 
-        # Clean data so only valid data is returned and register the valid date
+        # Create dataset - only the first data series - no idea what would return more than one.
         series_data = []
         last_valid_date = ""
         if result_json["Series"]:
             for data in result_json["Series"][0]["Data"]:
-                # Only add complete data, unless it is the Year or Month zoom levels
-                if data["IsComplete"] == True or zoomLevel < 2:
-                    series_data.append({
-                        "DateFrom" : data["DateFrom"],
-                        "DateTo" : data["DateTo"],
-                        "Value" : data["Value"]
-                    })
-                    # NOTE: Assuming data is sorted by date - which it is
-                    last_valid_date = data["DateTo"]
+                # Add data - complete or not!
+                series_data.append(
+                    {"DateFrom": data["DateFrom"], "Value": data["Value"]}
+                )
+                # NOTE: Assuming data is sorted by date - which it is
+                last_valid_date = data["DateTo"]
 
         # Return first data series.  Unknown how more series could come from a single metering device?
         meter_data = {
-            "type" : metering_device['type'],
-            "Data" : series_data,
-            "Total" : result_json["Total"],
-            "Average": result_json["Average"],
-            "Maximum": result_json["Maximum"],
-            "Minimum": result_json["Minimum"],
-            "LastValidDate" : last_valid_date
-            }
+            "type": metering_device["type"],
+            "Data": series_data,
+            "Extra": {
+                "Sum": result_json["Total"]["Value"],
+                "Avg": result_json["Average"]["Value"],
+                "Max": result_json["Maximum"]["Value"],
+                "Min": result_json["Minimum"]["Value"],
+                "LastValidDate": last_valid_date,
+            },
+        }
         _LOGGER.debug(f"Retrieved data from API: {meter_data}")
         return meter_data
 
-    def _get_all_consumption_timeseries(self, dateFrom, dateTo, zoomLevel = 0):
-        """ Retrieve data from all active metering devices """
+    def _get_all_consumption_timeseries(self, dateFrom, dateTo, zoomLevel=0):
+        """Retrieve data from all active metering devices"""
         meter_data = []
         for active_meter in self._active_meters:
-            meter_data.append(self._get_consumption_timeseries(active_meter, dateFrom, dateTo, zoomLevel))
+            meter_data.append(
+                self._get_consumption_timeseries(
+                    active_meter, dateFrom, dateTo, zoomLevel
+                )
+            )
         return meter_data
 
-    def _get_year_data(self):
-        dateFrom = datetime.now().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-        dateTo = datetime.now().replace(month=12, day=31, hour=23, minute=59, second=59, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-        _LOGGER.debug(f"Getting Year data from {dateFrom} to {dateTo}")
-        time_series = self._get_all_consumption_timeseries(dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level['Year'])
+    def _local_to_utc(self, local_time):
+        """Convert a local time to UTC time including timezone and summer(DST)/winter time offsets."""
+        return local_time.astimezone(ZoneInfo("UTC"))
+        # TODO: Find out what is going on here.  If the system time is UTC, the lines below does what is correct.
+        #       If the system time is CET or Europe/Copenhagen, the line above works.
+        #
+        #
+        # local_time_with_timezone = local_time.astimezone(self.tz)
+        # utc_offset = local_time_with_timezone.utcoffset()
+        # return local_time.astimezone(ZoneInfo("UTC")) - utc_offset
 
-        for series in time_series:
-            type = series.pop('type')
-            self._meter_data[type]["year"] = series
+    def _local_str_to_utc_str(self, local_time_str):
+        """Convert a local ISO time string to UTC time strimg."""
+        return self._utc_to_isostr(
+            self._local_to_utc(datetime.fromisoformat(local_time_str))
+        )
 
-            if self._last_valid_day:
-                self._meter_data[type]["year"]["LastValidDate"] = self._last_valid_day
+    def _local_str_to_utc(self, local_time_str):
+        """Convert a local ISO time string to UTC time strimg."""
+        return self._local_to_utc(datetime.fromisoformat(local_time_str))
 
-            if series['Data']:
-                #_LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
-                _LOGGER.debug(f"Year Total for {type}: {series['Total']['Value']}")
-            else:
-                _LOGGER.warning("The KMD API returned no yearly data.  Expect sensors to signal 'unavailable'")
+    def _utc_to_isostr(self, utc_time):
+        return utc_time.isoformat().replace("+00:00", "Z")
 
-    def _get_month_data(self):
-        # These get all months of the year
-        #dateFrom = datetime.now().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-        #dateTo = datetime.now().replace(month=12, hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-        # Get just the current month
-        now = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        dateFrom = now.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-        dateTo = (now.replace(now.year + int(now.month/12), now.month%12+1, 1)-timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-
-        _LOGGER.debug(f"Getting Month data from {dateFrom} to {dateTo}")
-        time_series = self._get_all_consumption_timeseries(dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level['Month'])
-
-        for series in time_series:
-            type = series.pop('type')
-            self._meter_data[type]["month"] = series
-
-            if self._last_valid_day:
-                self._meter_data[type]["month"]["LastValidDate"] = self._last_valid_day
-
-            #_LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
-            if series['Data']:
-                for month_data in series['Data']:
-                    _LOGGER.debug(f"{type} {month_data['DateFrom']} - {month_data['DateTo']} - {month_data['Value']}")
-                _LOGGER.debug(f"Month Total/Avg/Min/Max for {type}: {series['Total']['Value']} / {series['Average']['Value']} / {series['Minimum']['Value']} / {series['Maximum']['Value']}")
-            else:
-                _LOGGER.warning("The KMD API returned no monthly data.  Expect sensors to signal 'unavailable'")
-
-    def _get_day_data(self):
-        now = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        dateFrom = now.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-        dateTo = (now.replace(now.year + int(now.month/12), now.month%12+1, 1)-timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-        _LOGGER.debug(f"Getting Day data from {dateFrom} to {dateTo}")
-        time_series = self._get_all_consumption_timeseries(dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level['Day'])
-
-        for series in time_series:
-            type = series.pop('type')
-            self._meter_data[type]["day"] = series
-
-            #self._last_valid_day = self._meter_data["day"]["Data"][-1]["DateFrom"]
-            self._last_valid_day = self._meter_data[type]["day"]["LastValidDate"]
-
-            #_LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
-            if series['Data']:
-                for day_data in series['Data']:
-                    _LOGGER.debug(f"{type} {day_data['DateFrom']} - {day_data['DateTo']} - {day_data['Value']}")
-                _LOGGER.debug(f"Day Total/Avg/Min/Max/ValidDate for {type}: {series['Total']['Value']} / {series['Average']['Value']} / {series['Minimum']['Value']} / {series['Maximum']['Value']} / {self._last_valid_day}")
-            else:
-                _LOGGER.warning("The KMD API returned no daily data.  Expect sensors to signal 'unavailable'")
-
-    def _get_hour_data(self, days_back = None, from_date = None):
+    def get_statistics(self, from_date=None):
         """
-        If days_back is set, the function returns valid data this many days back.  A 1 could result in no valid data returned.
-           If it is not set, data returned is from the last valid day.
+        Retrieve statistics based on hourly data resolution from the API.
 
-        from_date can be set instead to the day in the month from which to start getting data.  All days until present day will be retrieved.
-           this is a datetime object
+        from_date is a datetime object with the date in local time from which to start retrieving data.  All days until present day will be retrieved.
         """
-        if days_back:
-            start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-            duration = range(days_back, 0, -1)
-        elif from_date:
-            start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-            duration = range((start_date - from_date).days, 0, -1)
-        else:
-            start_date = datetime.strptime(self._last_valid_day, '%Y-%m-%dT%H:%M:%S%z').replace(hour=0, minute=0, second=0, microsecond=0)
-            duration = range(1)
+        if from_date is None:
+            # If no date, just return - no default behaviour
+            return None
+
+        # Calculate date range to process - clean time settings too
+        from_date_input = from_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_date_input = datetime.now().replace(
+            hour=23, minute=59, second=59, microsecond=0
+        )
+        days_back = (end_date_input - from_date_input).days
+        duration = range(days_back)
+        _LOGGER.debug(
+            f"Statistics range to fetch: {from_date_input}-{end_date_input} | {days_back} day(s)"
+        )
 
         first_day = [True] * len(self._meter_data)
         for day in duration:
-            now = (start_date - timedelta(days=day)).replace(hour=0, minute=0, second=0, microsecond=0)
-            # I would claim this is a bug in the REST service.  Asking for data for an hour also return the hour after. So we ask for data until 22:59 to
-            # not get data from 00:00-00:59 the day after. That throws off the avg/min/max numbers for the day.  So -1 hour on 'from' and 'to'
-            dateFrom = (now - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-            dateTo =  now.replace(hour=22, minute=59, second=59, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-            #dateTo = now.replace(hour=23, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-            _LOGGER.debug(f"Getting Hour data {day} day(s) back in time from {dateFrom} to {dateTo}")
-            time_series = self._get_all_consumption_timeseries(dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level['Hour'])
+            # "DateFrom":"2024-03-31T22:00:00.000Z", "DateTo":"2024-04-02T21:59:59.999Z",  <- sommertid
+            # "DateFrom":"2024-10-27T23:00:00.000Z", "DateTo":"2024-10-28T22:59:59.999Z"   <- vintertid
+            now = from_date_input + timedelta(days=day)
+            dateFrom = self._utc_to_isostr(self._local_to_utc(now))
+            dateTo = self._utc_to_isostr(
+                self._local_to_utc(
+                    now.replace(hour=23, minute=59, second=59, microsecond=0)
+                )
+            )
+            _LOGGER.info(
+                f"Statistics fetch {days_back-day} day(s) back ({dateFrom} to {dateTo})"
+            )
+
+            time_series = self._get_all_consumption_timeseries(
+                dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level["Hour"]
+            )
 
             for idx, series in enumerate(time_series):
-                type = series.pop('type')
-
                 if first_day[idx]:
-                    self._meter_data[type]['hour'] = series
+                    meter_type = series.pop("type")
                     first_day[idx] = False
-                elif series['Data']:
-                    # If the dataset returned is not empty, move the valid date and mix/max/avg data forward.
-                    # That will ensure the dataset reflects the latest values in case they are >24h old
-                    self._meter_data[type]['hour']['Data'] = self._meter_data[type]['hour']['Data'] + series['Data']
-                    self._meter_data[type]['hour']['Total'] = series['Total']
-                    self._meter_data[type]['hour']['Average'] = series['Average']
-                    self._meter_data[type]['hour']['Maximum'] = series['Maximum']
-                    self._meter_data[type]['hour']['Minimum'] = series['Minimum']
-                    self._meter_data[type]['hour']['LastValidDate'] = series['LastValidDate']
+                if series["Data"]:
+                    # If the dataset returned is not empty extend dataset
+                    self._meter_data[meter_type].extend(series["Data"])
+                    self._meter_data_extra[meter_type].append(series["Extra"])
 
-                #_LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
+                # _LOGGER.debug(json.dumps(time_series, sort_keys = False, indent = 4))
+        # Debug output only:
+        _LOGGER.debug(f"Statistics data:\n{self._meter_data}")
+        _LOGGER.debug(f"Statistics extra_data:\n{self._meter_data_extra}")
         for key, series_type in self._meter_data.items():
-            if 'hour' in series_type:
-                for hour_data in series_type['hour']['Data']:
-                    _LOGGER.debug(f"{hour_data['DateFrom']} - {hour_data['DateTo']} - {hour_data['Value']}")
-                _LOGGER.debug(f"Total/Avg/Min/Max: {series_type['hour']['Total']['Value']} / {series_type['hour']['Average']['Value']} / {series_type['hour']['Minimum']['Value']} / {series_type['hour']['Maximum']['Value']}")
-            #else:
-            #    _LOGGER.warning("The KMD API returned no hourly data.  Expect sensors to signal 'unavailable'")
+            for hour_data in series_type:
+                _LOGGER.debug(f"{hour_data['DateFrom']} - {hour_data['Value']}")
+        for key, series_type in self._meter_data_extra.items():
+            for extra_data in series_type:
+                _LOGGER.debug(
+                    f"Sum/Avg/Min/Max: {extra_data['Sum']} / {extra_data['Avg']} / {extra_data['Min']} / {extra_data['Max']} | {extra_data['LastValidDate']}"
+                )
 
-
-    def get_latest(self):
-        # NOTE: This part is all due to login screen reCAPTCHA down to ^^
-        now = datetime.now()
-        # Allow 45 minutes since the last token update.  If updating after this point, return dummy data.
-        if self._access_token == "" or datetime.strptime(self._access_token_date_updated, '%Y-%m-%dT%H:%M:%S') + timedelta(minutes=45) < now:
-            _LOGGER.debug("Access_token too old or not set correctly:")
-            dateTo =  now.strftime("%Y-%m-%dT%H:%M:%S+00:00")
-            dateTwo =  now.strftime("%Y-%m-%dT%H:%M:%S")
-            return {
-                'water' : {
-                    'day': {
-                        'Data': [
-                            {'DateFrom': None, 'DateTo': None, 'Value': None},
-                        ],
-                        'Total':   {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Average': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Maximum': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Minimum': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'LastValidDate': dateTo
-                    },
-                    'year': {
-                        'Data': [
-                            {'DateFrom': None, 'DateTo': None, 'Value': None}
-                        ],
-                        'Total':   {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Average': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Maximum': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Minimum': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'LastValidDate': dateTo
-                    },
-                    'month': {
-                        'Data': [
-                            {'DateFrom': None, 'DateTo': None, 'Value': None}
-                        ],
-                        'Total':   {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Average': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Maximum': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Minimum': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'LastValidDate': dateTo
-                    },
-                    'hour': {
-                        'Data': [
-                            {'DateFrom': None, 'DateTo': None, 'Value': None},
-                        ],
-                        'Total':   {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Average': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Maximum': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'Minimum': {'Value': None, 'DateFrom': None, 'DateTo': None},
-                        'LastValidDate': dateTwo
-                    },
-                    'valid_date': {'Value': dateTo }
-                }
-            }
-        ###^^^^^
-        self._get_customer_id()
-
-        self._get_active_meters()
-
-        # NOTE: Returned is the first element in the meters list.
-        #       This works for people with one water meter.
-        #       If this is a problem, file a feature extension or a pull request to fix.
-        #       Look for "time_series[0]"
-        # Next up retrieve data series for:
-        # - valid days in this month
-        #  Daily data can be fetched across years
-        #  Total/min/max/avg consumption is calculated over the fetched dataset
-        #  This also set the self._last_valid_day field
-        self._get_day_data()
-
-        # - year to date
-        self._get_year_data()
-
-        # - this month
-        self._get_month_data()
-
-        # - valid hours for the last valid day
-        # Each day must be fetched individually because the server only returns values from the FromDate day.
-        # It seems Novafos has valid data varying from 5 days in the past to yesterday.
-        # This one retrieves data from the first day in the month.
-        #self._get_hour_data(from_date=datetime.now().replace(day=1))
-        # This one retrieves data 'days_back' days back
-        self._get_hour_data(days_back=1)
-
-        # Lastly make an entry for the last valid day in the dataset.  Maybe someone can use this.
-        self._meter_data['water']["valid_date"] = {}
-        self._meter_data['water']["valid_date"]["Value"] = self._last_valid_day
-        if 'heating' in self._meter_data:
-            self._meter_data['heating']["valid_date"] = {}
-            self._meter_data['heating']["valid_date"]["Value"] = self._last_valid_day
-
+        # Data structure returned:
+        #  { 'water': [{'DateFrom: <date>, 'Value': <float>}, ...],
+        #    'heating': [{'DateFrom: <date>, 'Value': <float>}, ...],}
         return self._meter_data
+
+    def get_year_data(self):
+        """
+        Retrieve statistics for the full year from the API.
+
+        from_date is a datetime object with the date in local time from which to start retrieving data.  All days until present day will be retrieved.
+
+        Returns:
+          { 'type': 'water',
+            'Data': [{'DateFrom': '2025-01-01T00:00:00', 'Value': 6.288}],
+            'Extra': {
+               'Sum': 6.288, 'Avg': 0.0, 'Max': 0.0, 'Min': 0.0, 'LastValidDate': '2025-12-31T23:59:59'
+            }
+          }
+        """
+        # Calculate date range to process - clean time settings too
+        from_date_input = datetime.now().replace(
+            month=1, day=1, hour=0, minute=0, second=0, microsecond=0
+        )
+        end_date_input = datetime.now().replace(
+            month=12, day=31, hour=23, minute=59, second=59, microsecond=0
+        )
+        dateFrom = self._utc_to_isostr(self._local_to_utc(from_date_input))
+        dateTo = self._utc_to_isostr(self._local_to_utc(end_date_input))
+
+        _LOGGER.debug(
+            f"Statistics year range to fetch: {from_date_input}-{end_date_input}"
+        )
+
+        time_series = self._get_all_consumption_timeseries(
+            dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level["Year"]
+        )
+
+        meter_year_data = {}
+        for series in time_series:
+            type = series.pop("type")
+            meter_year_data[type] = series
+
+            if self._last_valid_day:
+                meter_year_data[type]["LastValidDate"] = self._last_valid_day
+
+            if series["Data"]:
+                _LOGGER.debug(f"Year Total for {type}: {series}")
+                _LOGGER.debug(json.dumps(time_series, sort_keys=False, indent=4))
+            else:
+                _LOGGER.warning(
+                    "The KMD API returned no yearly data.  Expect sensors to signal 'unavailable'"
+                )
+        return meter_year_data
+
+    def group_by_day(self, meter_type):
+        """
+        Groups the input data into buckets of 24 hourly measurements per day.
+
+        Args:
+            meter_type: A string water, heating designating which data series to group
+            prev_day_data: A data structure ('2024-01-02', 0.67, 0.502, 0.168, 0.67, 0.419)
+                with the possible last statistic data
+
+        Returns:
+            A dictionary where keys are dates in the format "YYYY-MM-DD"
+            and values are lists of tuples representing hourly measurements
+            for that day.
+            The returned data is (date, sum, change, min, max, mean)
+            sum = sum of consumption for all 24 hours
+            change = change of sum since yesterday
+            min = min value of the hourly data
+            max = max value of the hourly data
+            mean = mean value of the hourly data
+        """
+        daily_data = {}
+        daily_stats = []
+        daily_sums = []
+
+        for item in self._meter_data[meter_type]:
+            # _LOGGER.debug(item)
+            date_str = item["DateFrom"]
+            measurement = item["Value"]
+            # date = self._local_str_to_utc(date_str)
+            date = datetime.fromisoformat(date_str)
+            date_key = date.strftime("%Y-%m-%d")  # Format date as "YYYY-MM-DD"
+            if date_key not in daily_data:
+                daily_data[date_key] = []
+            daily_data[date_key].append((date_str, measurement))
+
+        # _LOGGER.debug(sorted(daily_data.items()))
+
+        for date, hourly_data in sorted(daily_data.items()):
+            if len(hourly_data) == 24:  # Ensure 24 hourly measurements
+                daily_sum = round(sum(measurement for _, measurement in hourly_data), 3)
+                daily_sums.append((date, daily_sum))
+                # _LOGGER.debug(daily_sums[-1])
+
+        # Handle the first day
+        curr_date, curr_sum = daily_sums[0]
+        curr_sum = round(curr_sum, 3)
+        daily_stats.append(
+            (
+                curr_date,
+                curr_sum,  # sum
+                curr_sum,  # change
+                curr_sum,  # min
+                curr_sum,  # max
+                curr_sum,  # mean
+            )
+        )
+
+        if len(daily_sums) > 1:
+            for i in range(1, len(daily_sums)):  # Iterate from the second day onwards
+                prev_date, prev_sum = daily_sums[i - 1]
+                curr_date, curr_sum = daily_sums[i]
+                daily_stats.append(
+                    (
+                        curr_date,
+                        round(curr_sum, 3),
+                        round(
+                            curr_sum - prev_sum, 3
+                        ),  # Calculate change for the current day
+                        min(curr_sum, prev_sum),
+                        max(curr_sum, prev_sum),
+                        round((curr_sum + prev_sum) / 2, 3),
+                    )
+                )
+
+        # _LOGGER.debug(f"Daily stats: {daily_stats}")
+        return daily_stats
+
+        # Code to calculate max min mean for the underlying hourly dataset.
+        # This is what the webinterface does.  It does not however maintain the
+        # magnitude of the data, but that of the underlying dataset.
+        #
+        # for date, hourly_data in sorted(daily_data.items()):
+        #     if len(hourly_data) == 24:  # Ensure 24 hourly measurements
+        #         daily_sum = round(sum(measurement for _, measurement in hourly_data),3)
+        #         min_val = round(min(measurement for _, measurement in hourly_data), 3)
+        #         max_val = round(max(measurement for _, measurement in hourly_data), 3)
+        #         mean_val = round(daily_sum / 24, 3)
+        #         daily_sums.append((date, daily_sum, max_val, min_val, mean_val))
+        #         #_LOGGER.debug(daily_sums[-1])
+
+        # # Handle the first day
+        # curr_date, curr_sum, curr_max, curr_min, curr_mean = daily_sums[0]
+        # daily_stats.append((
+        #     curr_date,
+        #     curr_sum,
+        #     curr_sum, #change
+        #     curr_min,
+        #     curr_max,
+        #     curr_mean
+        # ))
+
+        # if len(daily_sums) > 1:
+        #     for i in range(1, len(daily_sums)):  # Iterate from the second day onwards
+        #         prev_date, prev_sum, prev_max, prev_min, prev_mean = daily_sums[i-1]
+        #         curr_date, curr_sum, curr_max, curr_min, curr_mean = daily_sums[i]
+        #         daily_stats.append((
+        #             curr_date,
+        #             curr_sum,
+        #             round(curr_sum - prev_sum,3),  # Calculate change for the current day
+        #             curr_min,
+        #             curr_max,
+        #             curr_mean
+        #         ))
+
+        # _LOGGER.debug(f"Daily stats: {daily_stats}")
+        # return daily_stats
+
+    def get_grouped_statistics(self, meter_type: str, grouping: str):
+        """
+        Groups daily statistics into specified time intervals (daily, weekly, monthly, yearly).
+
+        Args:
+            daily_stats: A list of tuples, where each tuple represents daily statistics:
+                        (date, daily_sum, daily_change, daily_min_sum, daily_max_sum, daily_mean_sum)
+            grouping: String specifying the grouping interval ('day', 'week', 'month', 'year')
+
+        Returns:
+            A list of tuples, where each tuple represents statistics for the given grouing:
+            (grouping_start_date, grouping_sum, grouping_change, grouping_min_sum, grouping_max_sum, grouping_mean_sum)
+        """
+        grouping_stats = []
+        grouping_sums = []
+
+        daily_stats = self.group_by_day(meter_type)
+        if grouping == "day":
+            return daily_stats
+
+        if grouping == "week":
+            # Determine the start date of the first week in the data
+            first_date = datetime.strptime(daily_stats[0][0], "%Y-%m-%d")
+            first_week_start = first_date - timedelta(
+                days=first_date.weekday()
+            )  # Shift to Monday
+            # _LOGGER.debug(f"First week: {first_date}, {first_week_start}, {first_date.weekday()}")
+
+            current_week_start = first_week_start
+            week_sum = 0
+
+            for date, daily_sum, _, _, _, _ in daily_stats:
+                date_obj = datetime.strptime(date, "%Y-%m-%d")
+                if date_obj >= current_week_start and date_obj < (
+                    current_week_start + timedelta(days=7)
+                ):
+                    week_sum += daily_sum
+                else:
+                    grouping_sums.append(
+                        (current_week_start.strftime("%Y-%m-%d"), round(week_sum, 3))
+                    )
+                    # Move to the next Monday
+                    current_week_start += timedelta(days=7)
+                    week_sum = daily_sum
+
+            # Add the last week's data
+            if week_sum > 0:
+                grouping_sums.append(
+                    (current_week_start.strftime("%Y-%m-%d"), round(week_sum, 3))
+                )
+        elif grouping == "month":
+            current_month = None
+            grouping_sum = 0
+            for date, daily_sum, _, _, _, _ in daily_stats:
+                date_obj = datetime.strptime(date, "%Y-%m-%d")
+                if current_month is None:
+                    print("New month", date_obj.month)
+                    current_month = date_obj.month
+                    grouping_sum = daily_sum
+                elif current_month != date_obj.month:
+                    print("New month", date_obj.month)
+                    grouping_sums.append(
+                        (
+                            (date_obj.replace(day=1) - timedelta(days=1)).strftime(
+                                "%Y-%m-%d"
+                            ),
+                            round(grouping_sum, 3),
+                        )
+                    )
+                    current_month = date_obj.month
+                    grouping_sum = daily_sum
+                else:
+                    grouping_sum += daily_sum
+
+            if grouping_sum > 0:  # Add the last month's data
+                grouping_sums.append(
+                    (
+                        date_obj.replace(day=1).strftime("%Y-%m-%d"),
+                        round(grouping_sum, 3),
+                    )
+                )
+
+        elif grouping == "year":
+            current_year = None
+            grouping_sum = 0
+            for date, daily_sum, _, _, _, _ in daily_stats:
+                date_obj = datetime.strptime(date, "%Y-%m-%d")
+                if current_year is None:
+                    print("New year", date_obj.year)
+                    current_year = date_obj.year
+                    grouping_sum = daily_sum
+                elif current_year != date_obj.year:
+                    print("New year", date_obj.year)
+                    grouping_sums.append(
+                        (f"{current_year}-01-01", round(grouping_sum, 3))
+                    )
+                    current_year = date_obj.year
+                    grouping_sum = daily_sum
+                else:
+                    grouping_sum += daily_sum
+
+            if grouping_sum > 0:  # Add the last year's data
+                print("Add year", grouping_sum, current_year)
+                grouping_sums.append((f"{current_year}-01-01", round(grouping_sum, 3)))
+
+        _LOGGER.debug(f"Grouping_sums: {grouping_sums}")
+
+        if grouping_sums:
+            first_grouping_date, first_grouping_sum = grouping_sums[0]
+            grouping_stats.append(
+                (
+                    first_grouping_date,
+                    round(first_grouping_sum, 3),
+                    0.0,  # No change for the first grouping
+                    round(first_grouping_sum, 3),
+                    round(first_grouping_sum, 3),
+                    round(first_grouping_sum, 3),
+                )
+            )
+
+        if len(grouping_sums) > 1:
+            for i in range(1, len(grouping_sums)):
+                prev_grouping_date, prev_grouping_sum = grouping_sums[i - 1]
+                curr_grouping_date, curr_grouping_sum = grouping_sums[i]
+                grouping_stats.append(
+                    (
+                        curr_grouping_date,
+                        round(curr_grouping_sum, 3),
+                        round(curr_grouping_sum - prev_grouping_sum, 3),
+                        min(curr_grouping_sum, prev_grouping_sum),
+                        max(curr_grouping_sum, prev_grouping_sum),
+                        round((curr_grouping_sum + prev_grouping_sum) / 2, 3),
+                    )
+                )
+
+        _LOGGER.debug(f"Grouped stats: {grouping_stats}")
+        return grouping_stats
+
+    def get_dummy_data(self):
+        return {"water": [{"DateFrom": None, "Value": None}]}

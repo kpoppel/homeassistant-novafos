@@ -1,0 +1,8 @@
+pytest
+pytest-cov
+pytest-homeassistant-custom-component
+pytest-asyncio
+pytest-mock
+pytest-regressions
+testfixtures
+pre-commit

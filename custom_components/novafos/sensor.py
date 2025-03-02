@@ -1,7 +1,7 @@
 """Sensor platform for Novafos integration."""
+
 from __future__ import annotations
-from typing import Any, cast
-from datetime import datetime
+from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
@@ -14,20 +14,30 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
-import logging
-_LOGGER = logging.getLogger(__name__)
+from .const import (
+    DOMAIN,
+    WATER_SENSOR_TYPES,
+    HEATING_SENSOR_TYPES,
+    EXTRA_WATER_SENSOR_TYPES,
+    EXTRA_HEATING_SENSOR_TYPES,
+)
 
-from .const import DOMAIN, WATER_SENSOR_TYPES, HEATING_SENSOR_TYPES
 from .model import NovafosSensorDescription
 
+import logging
+
+_LOGGER = logging.getLogger(__name__)
+
+
 async def async_setup_entry(
-    hass:HomeAssistant,
-    config:ConfigEntry,
-    async_add_entities:AddEntitiesCallback) -> None:
+    hass: HomeAssistant, config: ConfigEntry, async_add_entities: AddEntitiesCallback
+) -> None:
     """Set up the sensor platform."""
     # Use the name for the unique id of each sensor. novafos_<supplierid>?
     name: str = config.data[CONF_NAME]
-    coordinator: DataUpdateCoordinator = hass.data[DOMAIN][config.entry_id]["coordinator"]
+    coordinator: DataUpdateCoordinator = hass.data[DOMAIN][config.entry_id][
+        "coordinator"
+    ]
     # coordinator has a 'data' field.  This is set to the returned API data value.
     # _async_update_data updates the field.
     # From this field the sensors will get their values afterwards.
@@ -35,18 +45,28 @@ async def async_setup_entry(
     # The sensors are defined in the const.py file
     sensors: list[NovafosWaterSensor] = []
     # The coordinator data is already populated and this means it is possible to 'auto-discover' which sensors to create:
-    if "water" in coordinator.data:
+    if "water" in coordinator.data[0]:
         for description in WATER_SENSOR_TYPES:
             sensors.append(NovafosWaterSensor(name, coordinator, description))
-    if "heating" in coordinator.data:
+            # _LOGGER.debug("Adding Novafos sensor %s", description.name)
+        if config.data["use_grouped_sensors"]:
+            for description in EXTRA_WATER_SENSOR_TYPES:
+                sensors.append(NovafosWaterSensor(name, coordinator, description))
+                # _LOGGER.debug("Adding Novafos sensor %s", description.name)
+
+    if "heating" in coordinator.data[0]:
         for description in HEATING_SENSOR_TYPES:
             sensors.append(NovafosWaterSensor(name, coordinator, description))
+        if config.data["use_grouped_sensors"]:
+            for description in EXTRA_HEATING_SENSOR_TYPES:
+                sensors.append(NovafosWaterSensor(name, coordinator, description))
 
     async_add_entities(sensors)
 
 
 class NovafosWaterSensor(CoordinatorEntity, SensorEntity):
     """Representation of a Sensor."""
+
     entity_description: NovafosSensorDescription
 
     def __init__(self, name, coordinator, description):
@@ -60,46 +80,42 @@ class NovafosWaterSensor(CoordinatorEntity, SensorEntity):
         _LOGGER.debug(f"Registering Sensor for {description.name}")
 
         self._attr_name = f"{name} {description.name}"
+        self._attr_unique_id = (
+            f"{name.lower()}-{description.sensor_type}-{description.key}"
+        )
 
-        # To keep things backwards compatible - water does not get 'water' on the sensor value.
-        if description.sensor_type != "water":
-            self._attr_unique_id = f"{name.lower()}-{coordinator.supplierid}-{description.sensor_type}-{description.key}"
-        else:
-            self._attr_unique_id = f"{name.lower()}-{coordinator.supplierid}-{description.key}"
-
-        # Note: Data is stored in self.coordinator.data[self.entity_description.key]
+        # Note: Data is stored in self.coordinator.data
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return extra state attributes."""
-        if self.entity_description.key in ("month", "day", "hour"):
-            self._attrs["last_valid_date"] = self.coordinator.data[self.entity_description.sensor_type][self.entity_description.key]["LastValidDate"]
-            self._attrs["average"] = self.coordinator.data[self.entity_description.sensor_type][self.entity_description.key]["Average"]
-            self._attrs["maximum"] = self.coordinator.data[self.entity_description.sensor_type][self.entity_description.key]["Maximum"]
-            self._attrs["minimum"] = self.coordinator.data[self.entity_description.sensor_type][self.entity_description.key]["Minimum"]
-            self._attrs["data"] = self.coordinator.data[self.entity_description.sensor_type][self.entity_description.key]["Data"]
-        elif self.entity_description.key == "year":
-            self._attrs["last_valid_date"] = self.coordinator.data[self.entity_description.sensor_type][self.entity_description.key]["LastValidDate"]
+        """Return extra state attributes.
+        Attributes could include the last total yearly consumption.
+        This value may be used in a template sensor which can in turn be
+        used in the energy dashboard.
+        TODO: If yearly values should be included it is probably a good idea
+              to just make that one extra REST API call and the the latest
+              year total.  Alternately the sum of all hours since start-of-year
+              is to be calculated on every fetch. That is many data points
+              at the end of the year.
+        """
+        _LOGGER.debug(self.coordinator.data)
+        if (
+            self.entity_description.key == "statistics"
+            and self.coordinator.data[1] is not None
+        ):
+            self._attrs["year_total"] = self.coordinator.data[1][
+                self.entity_description.sensor_type
+            ]["Data"][-1]["Value"]
+        #     self._attrs["last_valid_date"] = self.coordinator.data[self.entity_description.sensor_type][self.entity_description.key]["LastValidDate"]
         else:
             self._attrs = {}
         return self._attrs
 
+        # self._attrs = {}
+
     @property
     def native_value(self) -> StateType:
-        if self.entity_description.key == "hour":
-            # Return the hour data from the dataset at the current hour
-            # Condition: The hour data is exactly from yesterday.  Otherwise return None.
-            # Probably not too useful, but all data is in the attributes.
-            if datetime.strptime(self.coordinator.data[self.entity_description.sensor_type][self.entity_description.key]["LastValidDate"], '%Y-%m-%dT%H:%M:%S').day == datetime.now().day-1:
-                return cast(float, self.coordinator.data[self.entity_description.sensor_type][self.entity_description.key]["Data"][datetime.now().hour])["Value"]
-            else:
-                return None
-        elif self.entity_description.key == "valid_date":
-            return cast(datetime, datetime.strptime(self.coordinator.data[self.entity_description.sensor_type][self.entity_description.key]["Value"], '%Y-%m-%dT%H:%M:%S%z'))
-        elif self.coordinator.data[self.entity_description.sensor_type][self.entity_description.key]["Data"]:
-            # If the data array is present, return its value.
-            # In some instances the data-fetch cannot fetch data from the API endpoint
-            return cast(float, self.coordinator.data[self.entity_description.sensor_type][self.entity_description.key]["Data"][-1]["Value"])
-        else:
-            return None
-
+        # State needs to be unknown as the data is in the past and not a current measurement.
+        # If a state is set, this will go to the statistics too and make things look funny.
+        # return self.coordinator.data[2]
+        return None

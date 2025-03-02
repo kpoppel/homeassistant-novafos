@@ -1,3 +1,7 @@
+# Anything marked somehow to be ignored
+*.ignore
+*_copy
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -11,18 +11,13 @@
         "step": {
             "user": {
                 "data": {
-                    "supplierid": "Leverandør ID",
-                    "login_method": "Loginmetode",
-                    "name": "Sensornavn Præfix"
+                    "name": "Sensornavn Præfix",
+                    "use_grouped_sensors": "Brug ekstra statistiksensorer til dag, uge, måned og år"
                     }
             },
             "step_2": {
                 "data": {
-                    "password": "Kodeord",
-                    "username": "Brugernavn",
-                    "access_token": "Indsæt et nyt adgangstoken",
-                    "access_token_date_updated": "Ret ikke i dette felt.  Det er automatisk udfyldt med tidspunktet for opdatering af token.",
-                    "container_url": "URL til novafos-login container"
+                    "access_token": "Indsæt adgangstoken til opsætning eller opdatering af sensorer"
                 }
             }
         }
@@ -31,11 +26,7 @@
         "step": {
             "init": {
                 "data": {
-                    "password": "Kodeord",
-                    "username": "Brugernavn",
-                    "access_token": "Indsæt et nyt adgangstoken",
-                    "access_token_date_updated": "Ret ikke i dette felt.  Det er automatisk udfyldt med tidspunktet for opdatering af token.",
-                    "container_url": "URL til novafos-login container"
+                    "access_token": "Indsæt adgangstoken til opsætning eller opdatering af sensorer"
                 }
             }
         }
