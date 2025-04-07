@@ -16,7 +16,11 @@ from datetime import timedelta
 
 from .const import DOMAIN
 from homeassistant.components.recorder import DOMAIN as RECORDER_DOMAIN, get_instance
-from homeassistant.components.recorder.models import StatisticData, StatisticMetaData
+from homeassistant.components.recorder.models import (
+    StatisticData,
+    StatisticMetaData,
+    StatisticMeanType,
+)
 from homeassistant.components.recorder.statistics import (
     get_last_statistics,
     statistics_during_period,
@@ -233,7 +237,7 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
             # For min/max/average check out https://github.com/emontnemery/home-assistant/blob/dev/homeassistant/components/kitchen_sink/__init__.py#L148,
             # https://github.com/emontnemery/home-assistant/blob/dev/homeassistant/components/recorder/models/statistics.py#L31
             # metadata = StatisticMetaData(
-            #     has_mean=False,
+            #     mean_type=StatisticMeanType.ARITHMETIC,
             #     has_sum=True,
             #     name=f"Novafos {meter_type} Statistics",
             #     source=DOMAIN,
@@ -246,7 +250,7 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
             # Apexchart does not understand the domain:statistic noation, so we'll use an internal sensor instead.
             # Update the sensor statistics.  Only the hourly one is needed as the sensor can then aggregate data itself.
             metadata = StatisticMetaData(
-                has_mean=True,
+                mean_type=StatisticMeanType.ARITHMETIC,
                 has_sum=True,
                 name=None,
                 source=RECORDER_DOMAIN,
@@ -306,7 +310,7 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                     )
 
                 metadata = StatisticMetaData(
-                    has_mean=True,
+                    mean_type=StatisticMeanType.ARITHMETIC,
                     has_sum=True,
                     name=None,
                     source=RECORDER_DOMAIN,
