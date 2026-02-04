@@ -30,7 +30,7 @@ WATER_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
         suggested_display_precision=3,
         device_class=SensorDeviceClass.WATER,
         icon="mdi:water",
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL,
     ),
 )
 
@@ -44,7 +44,7 @@ EXTRA_WATER_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
         suggested_display_precision=3,
         device_class=SensorDeviceClass.WATER,
         icon="mdi:water",
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL,
     ),
     NovafosSensorDescription(
         sensor_type="water",
@@ -55,7 +55,7 @@ EXTRA_WATER_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
         suggested_display_precision=3,
         device_class=SensorDeviceClass.WATER,
         icon="mdi:water",
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL,
     ),
     NovafosSensorDescription(
         sensor_type="water",
@@ -66,7 +66,7 @@ EXTRA_WATER_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
         suggested_display_precision=3,
         device_class=SensorDeviceClass.WATER,
         icon="mdi:water",
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL,
     ),
     NovafosSensorDescription(
         sensor_type="water",
@@ -77,7 +77,7 @@ EXTRA_WATER_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
         suggested_display_precision=3,
         device_class=SensorDeviceClass.WATER,
         icon="mdi:water",
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL,
     ),
 )
 

@@ -38,7 +38,14 @@ async def update_listener(hass: HomeAssistant, entry: ConfigEntry):
     This code added because of reCAPTCHA login screen
     """
     _LOGGER.debug(f"Options updated: {entry.options}")
-    await hass.data[DOMAIN][entry.entry_id]["coordinator"].async_request_refresh()
+    # Ensure the coordinator picks up the updated token/options
+    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    # Update coordinator local copies from the stored entry options
+    coordinator.access_token = entry.options.get("access_token", "")
+    coordinator.access_token_date_updated = entry.options.get(
+        "access_token_date_updated", ""
+    )
+    await coordinator.async_request_refresh()
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

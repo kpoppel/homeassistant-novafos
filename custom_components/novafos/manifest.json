@@ -12,6 +12,6 @@
   "issue_tracker": "https://github.com/kpoppel/homeassistant-novafos/issues",
   "requirements": [],
   "ssdp": [],
-  "version": "5.0.1",
+  "version": "5.0.2",
   "zeroconf": []
 }

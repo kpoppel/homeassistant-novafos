@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from datetime import timedelta
+from unittest import result
 from zoneinfo import ZoneInfo
 import logging
 import json
@@ -35,6 +36,7 @@ class Novafos:
         self._customer_id = ""
         self._customer_number = ""
         self._active_meters = []
+        self._earliest_data_date = None
         self._meter_data = {}
         self._meter_data_extra = {}
         self._meter_data_grouped = {}
@@ -64,7 +66,8 @@ class Novafos:
         else:
             self._access_token = ""
             _LOGGER.error(
-                "Token update does not seem to have a valid length. Please check again. (This message is normal the first time the integration starts)"
+                "Token update does not seem to have a valid length %s. Please check again. (This message is normal the first time the integration starts)",
+                len(access_token),
             )
             return False
         _LOGGER.debug(
@@ -88,9 +91,16 @@ class Novafos:
             return False
         else:
             # Configure other data necessary for fetching data
-            self._get_customer_id()
-            self._get_active_meters()
-            return True
+            try:
+                self._get_customer_id()
+                self._get_active_meters()
+                return True
+            except LoginFailed as lf:
+                _LOGGER.error("Login failed during authenticate_using_access_token: %s", lf)
+                return False
+            except HTTPFailed as hf:
+                _LOGGER.error("HTTP failure during authenticate_using_access_token: %s", hf)
+                return False
 
     def _get_customer_id(self):
         # Need to retrieve the customer ID from the user profile to fetch data.
@@ -100,10 +110,37 @@ class Novafos:
 
         url = f"{self._api_url}/api/profile/get"
 
-        response = requests.get(url, headers=headers)
+        try:
+            response = requests.get(url, headers=headers)
+        except requests.exceptions.RequestException as req_err:
+            _LOGGER.error("Request error occurred while retrieving customer id: %s", req_err)
+            # Network or other request-level error
+            raise HTTPFailed from req_err
+
+        # Handle HTTP status codes explicitly: 401/403 indicate invalid/expired token
+        if response.status_code in (401, 403):
+            _LOGGER.error(
+                "Authentication failed when retrieving customer id: %s %s",
+                response.status_code,
+                response.text,
+            )
+            raise LoginFailed("Invalid or expired access token")
+
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as http_err:
+            _LOGGER.error("HTTP error occurred while retrieving customer id: %s", http_err)
+            raise HTTPFailed from http_err
+        # response = requests.get(url, headers=headers)
         # self._print_json(response.json(), "Retrieved customer ID JSON response")
-        self._customer_id = f"{response.json()['Customers'][0]['Id']}"
-        self._customer_number = f"{response.json()['Customers'][0]['Number']}"
+        # Parse and validate JSON payload
+        try:
+            resp_json = response.json()
+            self._customer_id = f"{resp_json['Customers'][0]['Id']}"
+            self._customer_number = f"{resp_json['Customers'][0]['Number']}"
+        except Exception as json_err:
+            _LOGGER.error("Failed to parse customer id response: %s", json_err)
+            raise HTTPFailed from json_err
         _LOGGER.debug(
             "Retrieved customer_id, number: %s, %s",
             self._customer_id,
@@ -180,6 +217,46 @@ class Novafos:
 
     def get_meter_types(self):
         return self._active_meters
+
+    def get_available_time_series_periods(self) -> datetime:
+        """Get data from the API about which time series periods are available for the active meters.
+        This can be used to determine how far back data is available for the statistics sensor.
+
+        [
+          {
+            "MeasurementPointId":12345678,
+            "UnitId":12345,
+            "RangeType":0,
+            "MinDate":"2022-01-01T00:00:00",
+            "MaxDate":"2026-02-04T00:00:00"
+          },
+          {
+            "MeasurementPointId":0,
+            "UnitId":0,
+            "RangeType":1,
+            "MinDate":"2022-01-01T00:00:00",
+            "MaxDate":"2026-12-31T00:00:00"
+          }
+        ]
+        """
+        headers = {
+            "Customer-Id": self._customer_id,
+            "Customer-Number": self._customer_number,
+            "Authorization": self._access_token,
+        }
+        url = f"{self._api_url}/api/consumption/availableTimeSeriesPeriods"
+        response = requests.get(url, headers=headers)
+        result_json = response.json()
+
+        # Enable logging DEBUG to see all returned data from the API:
+        self._print_json(
+            result_json, "Retrieved available timeseries periods JSON response"
+        )
+
+        # Entry with RangeType 0 is for the specific meter, and is the one we care about.  It has the actual earliest date of data available.
+        self._earliest_data_date = datetime.fromisoformat(result_json[0]["MinDate"])
+        # self._earliest_data_date = self._local_str_to_utc(result_json[0]["MinDate"])
+        return self._earliest_data_date
 
     def _get_consumption_timeseries(
         self, metering_device, dateFrom, dateTo, zoomLevel=0
@@ -350,7 +427,7 @@ class Novafos:
     def _utc_to_isostr(self, utc_time):
         return utc_time.isoformat().replace("+00:00", "Z")
 
-    def get_statistics(self, from_date=None):
+    def get_statistics(self, from_date=None) -> dict:
         """
         Retrieve statistics based on hourly data resolution from the API.
 
@@ -358,7 +435,7 @@ class Novafos:
         """
         if from_date is None:
             # If no date, just return - no default behaviour
-            return None
+            return {}
 
         # Calculate date range to process - clean time settings too
         from_date_input = from_date.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -383,7 +460,7 @@ class Novafos:
                 )
             )
             _LOGGER.info(
-                f"Statistics fetch {days_back-day} day(s) back ({dateFrom} to {dateTo})"
+                f"Statistics fetch {days_back - day} day(s) back ({dateFrom} to {dateTo})"
             )
 
             time_series = self._get_all_consumption_timeseries(

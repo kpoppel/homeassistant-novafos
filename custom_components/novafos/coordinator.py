@@ -123,7 +123,7 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
             if meter_type == "water":
                 unit = UnitOfVolume.CUBIC_METERS
             else:
-                unit = UnitOfEnergy.KILOWATT_HOUR
+                unit = UnitOfEnergy.KILO_WATT_HOUR
 
             # TODO: Find actual last statistics where sum is not zero??
             last_stats = await get_instance(self.hass).async_add_executor_job(
@@ -133,12 +133,27 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.debug("Last statistics (raw): %s", last_stats)
             if not last_stats:
                 # First time we insert 365 days of data (if available)
-                one_year_back = dt.now().replace(
-                    year=dt.now().year - 1, month=1, day=1, hour=0, minute=0, second=0
+                min_date = await self.hass.async_add_executor_job(
+                    self.api.get_available_time_series_periods
                 )
+
+                one_year_back = dt.now().replace(
+                    year=dt.now().year - 1,
+                    month=1,
+                    day=1,
+                    hour=0,
+                    minute=0,
+                    second=0,
+                )
+
+                # Don't go back further than the available data:
+                if min_date > one_year_back:
+                    one_year_back = min_date
+
                 _LOGGER.debug(
-                    "No last statistics detected - retrieving data since %s.",
+                    "No last statistics detected - retrieving data since %s. Your earliest data is from %s. This could take a while.",
                     one_year_back,
+                    min_date,
                 )
                 if debug:
                     data = self.api._meter_data
@@ -213,7 +228,7 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
             last_value = data[meter_type][0]["Value"]
             for val in data[meter_type]:
                 # Add timezone to dataset as Home Assistant works in UTC
-                from_time = dt_util.parse_datetime(f"{val["DateFrom"]}").replace(
+                from_time = dt_util.parse_datetime(f"{val['DateFrom']}").replace(
                     tzinfo=dt_util.get_time_zone(self.hass.config.time_zone)
                 )
                 _sum += val["Value"]
