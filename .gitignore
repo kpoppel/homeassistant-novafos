@@ -1,7 +1,3 @@
-# Anything marked somehow to be ignored
-*.ignore
-*_copy
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -132,5 +128,21 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# dev container stuff
-config/
+# artifacts
+__pycache__
+.pytest*
+*.egg-info
+*/build/*
+*/dist/*
+
+
+# misc
+.coverage
+#.vscode
+coverage.xml
+.ruff_cache
+
+
+# Home Assistant configuration
+config/*
+!config/configuration.yaml
