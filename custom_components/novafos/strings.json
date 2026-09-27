@@ -4,7 +4,8 @@
       "user": {
         "data": {
           "name": "[%key:common::config_flow::data::name%]",
-          "use_grouped_sensors": "[%key:common::config_flow::data::use_grouped_sensors%]"
+          "use_grouped_sensors": "Create grouped statistics sensors (deprecated)",
+          "use_external_statistics": "Create external hourly consumption statistics for trend graphs"
         }
       }
     },
@@ -15,6 +16,17 @@
     },
     "abort": {
       "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "access_token": "Insert a working access token (leave blank to keep current token)",
+          "use_grouped_sensors": "Create grouped statistics sensors (deprecated)",
+          "use_external_statistics": "Create external hourly consumption statistics for trend graphs"
+        }
+      }
     }
   }
 }

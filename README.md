@@ -28,9 +28,11 @@ Fully configurable through config flow.
   1. Head to configuration --> integration
   2. Add new and search for Novafos
   3. Enter your name for the sensors, default is "Novafos", but if you have more, go ahead and change it.
-  4. If you want extra sensors with statistics for grouped data by day, week, month, and year, check this box.
+  4. External hourly consumption statistics are enabled by default. The separate grouped statistics sensor option is deprecated; enable it only if you still use those entities.
   5. Enter a working access token to get started.  This will pre-load statistics 1 calendar year back in time.
      You can enter some random text to create the sensors without the pre-load of data.
+
+Both options can be changed later via Configure. Older installations keep their grouped sensor setting; external statistics are enabled by default independently of that setting. Disabling grouped sensors stops importing their grouped history, but does not delete existing recorder history. The main hourly `sensor.*` history remains available regardless of either option.
 
 ---
 # Notice on integration status and ways to login
@@ -87,7 +89,7 @@ This is how the manual method works:
      "expires_in": 3599,
      "scope": "openid profile pluginapi_int",
      "id_token": "<id token>"
-   }   
+   }
    ```
 1. Go to the integration page in settings and select "Configure" on the Novafos integration.
 1. Copy the `access_token` part into the Access Token field (this is a very long string of random characters)
@@ -100,34 +102,60 @@ This is how the manual method works:
 
 Data is delayed in the data warehouse.  Data validity will range from 24h to 5 days ago from today's midnight.
 This means the sensor data represents historical data and that the sensors presented by the integration have no current state (unknown).
-However all sensors are statistics sensors and can be shown using statistics cards, statistics graph and through apex-charts
-like any other sensor with real-time data.
+The integration imports this historical data into Home Assistant's long-term statistics. Use a Statistics graph, Statistic card,
+Energy dashboard or ApexCharts card to show it. An Entities card will only show the unknown current state.
 
 This means we have a slightly different visualisation flow compared to other sensors.
 
 The integration creates the following sensors for water/heating (here water used an an example).  "novafos" is configurable, this is the default value:
 * sensor.novafos_water_statistics
-  * Statistics sensor with hourly resolution.  Has (historical) state, max, min, mean value.
-* sensor.novafos_water_statistics_{day|week|month|year} (optional)
-  * The total consumption current until the last valid date
+  * Statistics sensor with hourly resolution. Stores a cumulative `sum`. Use `change` to see consumption per hour, day, week or month.
+  * This is the sensor you want to use for the energy dashboard.
+* sensor.novafos_water_statistics_{day|week|month|year} (optional, deprecated)
+  * Historical totals for each completed day, week, month or year. These are computed period totals.
+  * **Migrate away from these and use the external statistic instead.**
+* `novafos:water_hourly_consumption` (optional external statistic; `novafos:heating_hourly_consumption` for heating)
+  * Hourly based statistics. Use `change` in the built-in Statistics graph to show consumption trends day-to-day, week-to-week, month-to-month or year-to-year.
+  * This statistic has min/max/mean/change data calculated.
+  * Use `min` to detect leaks. It should always be 0.0 if you are not spending water all the time.
+  * Use `max` to find days of extraordinary water consumption.
+  * Use `mean` to see average consumption per reported hour within the selected period. The mean is dependent on the hours with data points.
+  * Use `change` to see the trend of consumption between selected periods. A rising trend is probably not a good sign.
 
-All water sensors show their value in cubic meters (m3) or for heating kWh.  The sensors have no attributes at this point in time.
-Under consideration is adding attributes for some sort of high/low warning so that an indication for high water use or never having zero flowcould be flagged.
+Water statistics use cubic meters (m3), heating statistics kilowatt-hours (kWh). Only `sum` is stored, since Home Assistant does not
+like `TOTAL` type sensors (statistics-only) to have `min`, `max` or `mean`. The `novafix:..._hourly_consumption` statistic stores
+arithmetic min/mean/max and change without changing the Energy dashboard's sensor history.
+The main sensor also exposes a `year_total` attribute when yearly data is available.
+
+Under consideration is adding attributes for some sort of high/low warning so that an indication for high water use or never having zero flow could be flagged.  You can add a helper which flags if the `min` is ever rising above 0.0.
 
 # Visualisation of the sensors using built-in cards
 
 Below some examples of how data can be visualised.  Only water is shown but the same should apply for heating data.
 
-## The main sensor: sensor.novafos_water_statistics
+- Using the `sensor.novafos_water_statistics` sensor, you can show values of hourly consumption over intervals of this/last year/month/week/day
+- Using `novafos:water_hourly_consumption`, you can show min/mean/max hourly consumption within a day, week, month or year.
 
-The current state of this sensor is always 'unknown'.  Use the statistics card and statistics graph card for displaying data.
-As the base data is hourly we can group data in day, week, month categories.
+Not all combinations will make sense. So try it out. The built-in cards are `Statistic` and `Statistic Graph`. An `Entity` card will _not_ work since there is no current state ever.
 
-### Statistics graphs
+# Examples: The main sensor - sensor.novafos_water_statistics
 
-Here are examples of the various graphs you can make using the built-in cards.
+The current state of this sensor is always 'unknown'. Use `change` on its long-term statistics to display consumption.
+As the base data is hourly, the Statistics graph can aggregate it by day, week or month.
 
-#### Monthly data
+## Statistics cards (built-in)
+
+Using the `sensor.novafos_water_statistics` with statistic type `change` and the `Statistic` card you can easily get data for periods out as a number.
+
+Add a `Statistic` card configure the sensor and set the priod you like to get data for yesterday (not today), or other periods. You will see a card like this:
+
+![alt text](images/statistics-card-yesterday.png)
+
+## Statistics graphs (built-in)
+
+Repeating the exercise using the `Statistics Graph` card it is also simple to display graph data over a period.  Some examples using the `sensor.novafos_water_statistics`.
+
+### Monthly data
 
 - Card: Statistics graph
   - Period: Month
@@ -136,7 +164,7 @@ Here are examples of the various graphs you can make using the built-in cards.
 
 ![alt text](images/statistics-graph-month.png)
 
-#### Weekly data
+### Weekly data
 
 - Card: Statistics graph
   - Period: Week
@@ -145,7 +173,7 @@ Here are examples of the various graphs you can make using the built-in cards.
 
 ![alt text](images/statistics-graph-week.png)
 
-#### Daily data
+### Daily data
 
 - Card: Statistics graph
   - Period: Day
@@ -154,7 +182,7 @@ Here are examples of the various graphs you can make using the built-in cards.
 
 ![alt text](images/statistics-graph-day.png)
 
-#### Hourly data
+### Hourly data
 
 - Card: Statistics graph
   - Period: Hour
@@ -163,92 +191,268 @@ Here are examples of the various graphs you can make using the built-in cards.
 
 ![alt text](images/statistics-graph-hour.png)
 
-For the hourly data you can furthermore get some nice graphs showing the mean value, min and max consumption across the periods.
-
-**Examples:**
-
-In all these examples the visualisation shows the _hourly_ min max and mean data grouped over the period.
-This means you are looking at the variation on hourly consumption over longer and longer time spans.
-If you want to see statistics where the statistics are calculated over the magnitude of the period - enable the optional sensors and look further down!
-
-With these charts though you can see trends in daily use. Here for example we can see that March, July/August,
-and October seem to be high runners in consumption.  This corresponds well with setting up and cleaning the greenhouse Spring and Fall, and watering
-the plants and little pool over the Summer.  It is also evident that there are no leaks, since the min value never leaves 0.0.
+For the hourly data you can furthermore get graphs showing the sum, state and change in consumption across the periods.
 
 - Card: Statistics graph
   - Period: Day
-  - Stat type: Min, Max, Mean
+  - Stat type: Sum, State, Change
   - Chart type: Line
 
-![alt text](images/statistics-graph-hour-day-mma.png)
+![alt text](images/statistics-graph-sum-state-change.png)
 
-- Card: Statistics graph
-  - Period: Week
-  - Stat type: Min, Max, Mean
-  - Chart type: Line
+(Note: If you try out using the optional computed grouped sensors you need to use the `state` statistic)
 
-![alt text](images/statistics-graph-hour-week-mma.png)
+## Max, min, mean graphs using Apexchart
 
-- Card: Statistics graph
-  - Period: Week
-  - Stat type: Min, Max, Mean
-  - Chart type: Line
+Since Home Assistant does not allow `TOTAL` type sensors to have mean values stored as statistics, we can calculate this
+from the horly statistics values using Apexchart instead. The visualisation looks almost like the former data, and takes
+a little more effort to setup.  For you: install Apexchart and copy the configurations below.
 
-![alt text](images/statistics-graph-hour-month-mma.png)
+Use `sensor.novafos_water_statistics` with statistic type `change` to show the consumption within the selected period.
 
-### Statistic card
+### Daily max/min/mean consumption using hour grouping
 
-Using the Statistic card you can show some quick numbers which may be of interest:
+This configuration illustrates daily min/max/mean values across a month using hour-grouping.  The minimum is (hopefully) always 0.0 m3
+unless there is a leak in the water system or we were filling up that swimming pool again that summer.
 
-- Using the `sensor.novafos_water_statistics` sensor, you can show min /max/mean value of hourly consumption over intervals of this/last year/month/week/day
-- Using the `sensor.novafos_water_statistics_{day, week, month, year}` sensors,  you can show min /max/mean value of day/week/month/year consumption over intervals of this/last year/month/week/day
+![alt text](images/statistics-apex-day-mma.png)
 
-Not all combinations will make sense. So try it out.
+```
+type: custom:apexcharts-card
+graph_span: 28d
+span:
+  start: day
+  offset: -28d
+header:
+  show: true
+  title: Dag min/max/gns
+series:
+  - entity: sensor.novafos_water_statistics
+    name: Maks pr. time
+    type: area
+    color: "#9bb5ed"
+    opacity: 0.35
+    stroke_width: 1
+    float_precision: 3
+    statistics:
+      type: state
+      period: hour
+      align: start
+    group_by:
+      func: max
+      duration: 1d
+      fill: "null"
 
-Here are some examples using the main sensor:
+  - entity: sensor.novafos_water_statistics
+    name: Gennemsnit pr. time
+    type: line
+    color: "#4169cf"
+    stroke_width: 2
+    float_precision: 3
+    statistics:
+      type: state
+      period: hour
+      align: start
+    group_by:
+      func: avg
+      duration: 1d
+      fill: "null"
 
-![alt text](images/statistics-card-hour-example_1.png)
+  - entity: sensor.novafos_water_statistics
+    name: Min pr. time
+    type: line
+    color: "#71839b"
+    stroke_width: 1
+    float_precision: 3
+    statistics:
+      type: state
+      period: hour
+      align: start
+    group_by:
+      func: min
+      duration: 1d
+      fill: "null"
 
-## The optional sensors: sensor.novafos_water_statistics_{day, week, month, year}
+apex_config:
+  chart:
+    height: 250
+  yaxis:
+    min: 0
+    title:
+      text: m³
+```
 
-These optional sensors help visualising min, max, mean statistics while keeping the magnutide of the aggregation period.
-What it means is that the grouping of hourly data into intervals of daily, weekly, monthly and yearly data lets us calculate
-the min, man and mean in those intervals and can show the consumption in that resolution varies over time.  This means in
-turn that, say the weekly interval can show if certain weeks have a large variation, and how the average consumption
-varies over the selected number of days.
+The same graph can be displayed using the `Statistics Graph` card and using the `novafos:water_hourly_consumption` statistic with `max/min/mean` selected.
 
-The graphs can of course still be shown with the other card-intervals in which case they will just show the averages
-with that resolution and magnitude.
+### Daily max/min/mean consumption
 
-Lets show this with with images:
+This configuration illustrates daily min/max/mean values across a month using a 2-day grouping.  It may not be very useful, but if you want to see grouped data across a period comparing adjacent days or other periods, this is the way.
 
-- Card: Statistics graph
-  - Sensor: Novafos Water statistics day
-  - Period: Day
-  - Stat type: Min, Max, Mean
-  - Chart type: Line
+![alt text](images/statistics-apex-day2-mma.png)
 
-![alt text](images/statistics-graph-day-mma.png)
+```
+type: custom:apexcharts-card
+# Set the graph span, i.e. how many days to display:
+graph_span: 30d
+span:
+  start: day
+  # Adjust the offset in days in the past (match the span above)
+  offset: -30d
+header:
+  show: true
+  title: Dagligt forbrug - min/max/gns
+series:
+  - entity: sensor.novafos_water_statistics
+    name: Maks dag
+    type: area
+    color: '#9bb5ed'
+    opacity: 0.35
+    stroke_width: 1
+    float_precision: 3
+    statistics:
+      type: change
+      # change your resolution here: day, week, month, year
+      # do this for all graphs
+      period: day
+      align: start
+    group_by:
+      func: max
+      # Change how many units to bundle up at a time: 2d, 2w, 2m, 2y or more
+      # do this for all graphs
+      duration: 2d
+      fill: 'null'
+  - entity: sensor.novafos_water_statistics
+    name: Gennemsnitlig dag
+    type: line
+    color: '#4169cf'
+    stroke_width: 2
+    float_precision: 3
+    statistics:
+      type: change
+      period: day
+      align: start
+    group_by:
+      func: avg
+      duration: 2d
+      fill: 'null'
+  - entity: sensor.novafos_water_statistics
+    name: Min dag
+    type: line
+    color: '#71839b'
+    stroke_width: 1
+    float_precision: 3
+    statistics:
+      type: change
+      period: day
+      align: start
+    group_by:
+      func: min
+      duration: 2d
+      fill: 'null'
+apex_config:
+  chart:
+    height: 250
+  yaxis:
+    min: 0
+    title:
+      text: m³ per day
+```
 
-- Card: Statistics graph
-  - Sensor: Novafos Water statistics week
-  - Period: Week
-  - Stat type: Min, Max, Mean
-  - Chart type: Line
+### Monthly max/min/mean consumption
 
-![alt text](images/statistics-graph-week-mma.png)
+This configuration illustrates daily min/max/mean values across a year using a 2-monthly grouping.
 
-- Card: Statistics graph
-  - Sensor: Novafos Water statistics month
-  - Period: Month
-  - Stat type: Min, Max, Mean
-  - Chart type: Line
+![alt text](images/statistics-apex-month-mma.png)
 
-![alt text](images/statistics-graph-month-mma.png)
+```
+type: custom:apexcharts-card
+graph_span: 365d
+span:
+  end: month
+  offset: -1month
+header:
+  show: true
+  title: Månedligt forbrug - min/max/gns
+series:
+  - entity: sensor.novafos_water_statistics
+    name: Maks måned
+    type: area
+    color: '#9bb5ed'
+    opacity: 0.35
+    stroke_width: 1
+    float_precision: 3
+    statistics:
+      type: change
+      period: month
+      align: start
+    group_by:
+      func: max
+      duration: 60d
+      fill: 'null'
+  - entity: sensor.novafos_water_statistics
+    name: Gennemsnitlig måned
+    type: line
+    color: '#4169cf'
+    stroke_width: 2
+    float_precision: 3
+    statistics:
+      type: change
+      period: month
+      align: start
+    group_by:
+      func: avg
+      duration: 60d
+      fill: 'null'
+  - entity: sensor.novafos_water_statistics
+    name: Min måned
+    type: line
+    color: '#71839b'
+    stroke_width: 1
+    float_precision: 3
+    statistics:
+      type: change
+      period: month
+      align: start
+    group_by:
+      func: min
+      duration: 60d
+      fill: 'null'
+apex_config:
+  chart:
+    height: 250
+  yaxis:
+    min: 0
+    title:
+      text: m³ per month
+```
 
+## Hourly consumption in the built-in Statistics graph
 
-There is a 'year' sensor too for the enthisiast, this one is a _very_ slow moving sensor... but it is there.
-Use it with the "month" card period once at least 3 years of data has been collected. Good luck.
+Enable external statistics in the integration settings. This publishes
+`novafos:water_hourly_consumption` and, if available, `novafos:heating_hourly_consumption`.
+These are external statistic IDs, not sensor entities, so they are not shown on the Entities page.
+To find them in the dashboard editor, choose **Add card**, **By card**, **Statistics Graph**,
+then **Add a statistic**. Search for **Novafos water hourly consumption** (or heating).
+The picker lists external statistics that have data. The equivalent YAML configuration is:
+
+```yaml
+type: statistics-graph
+entities:
+  - novafos:water_hourly_consumption
+period: day
+days_to_show: 30
+stat_types:
+  - change
+chart_type: line
+```
+
+Each point is the **total consumption** for that day. Change `period` to `week`, `month`
+or `year` to compare consecutive calendar periods with the same statistic ID; increase
+`days_to_show` to include enough periods. `sum` is the running total, not the consumption
+within each period. `min`, `mean` and `max` summarize the **hourly** readings within each
+period, not its total consumption. The current, unfinished period can appear in the graph.
+For a single number use a Statistic card with `entity: novafos:water_hourly_consumption`,
+`stat_type: change`, and a calendar or rolling period.
 
 # Visualisation of the sensors using apex-chart
 
@@ -259,7 +463,7 @@ Here are some apex-chart examples.  With these example you should get the idea a
 
 ## Chart showing daily change
 
-The chart can be set to change, min, max, sum
+Use `change` for consumption in each day. `sum` and `state` are also available.
 
 ![alt text](images/apex-chart-day-change.png)
 
@@ -386,6 +590,96 @@ series:
       align: start
 ```
 
+## Daily consumption and 7-day mean
+
+This chart shows daily consumption as columns and the mean daily consumption in each 7-day block as a line.
+Both series use the main hourly sensor's historical `change` values, not its unknown current state or the removed `mean` statistic.
+
+```yaml
+type: custom:apexcharts-card
+graph_span: 28d
+span:
+  start: day
+  offset: -28d
+header:
+  show: true
+  title: Daily water use
+series:
+  - entity: sensor.novafos_water_statistics
+    name: Daily
+    type: column
+    unit: m³/day
+    float_precision: 3
+    statistics:
+      type: change
+      period: day
+  - entity: sensor.novafos_water_statistics
+    name: 7-day mean
+    type: line
+    unit: m³/day
+    float_precision: 3
+    statistics:
+      type: change
+      period: day
+    group_by:
+      func: avg
+      duration: 7d
+      fill: "null"
+```
+
+## Lowest, mean and highest day
+
+This card compares daily consumption within each 7-day block. The header shows the latest block's lowest, mean and highest
+day; the chart shows four consecutive blocks. These are **daily totals**, not the smallest and largest hourly readings.
+
+```yaml
+type: custom:apexcharts-card
+graph_span: 28d
+span:
+  start: day
+  offset: -28d
+header:
+  show: true
+  show_states: true
+  title: Weekly water use per day
+series:
+  - entity: sensor.novafos_water_statistics
+    name: Lowest day
+    float_precision: 3
+    statistics:
+      type: change
+      period: day
+    group_by:
+      func: min
+      duration: 7d
+      fill: "null"
+  - entity: sensor.novafos_water_statistics
+    name: Mean day
+    float_precision: 3
+    statistics:
+      type: change
+      period: day
+    group_by:
+      func: avg
+      duration: 7d
+      fill: "null"
+  - entity: sensor.novafos_water_statistics
+    name: Highest day
+    float_precision: 3
+    statistics:
+      type: change
+      period: day
+    group_by:
+      func: max
+      duration: 7d
+      fill: "null"
+```
+
+The 28-day window ends at the start of today, excluding today's incomplete data. Novafos may be several days behind:
+if the last 7-day block has missing days, shift `span.offset` further back until it contains seven reported days.
+These are consecutive 7-day blocks, not calendar weeks. For heating, replace `water` with `heating` in the entity ID;
+in the first chart, also change each `unit: m³/day` to `unit: kWh/day`. The second chart uses the sensor's unit automatically.
+
 # Debugging
 
 It is possible to debug log the raw response from KMD API. This is done by setting up logging
@@ -395,8 +689,8 @@ only have this activated when reporting a bug.  However, _when_ reporting a bug,
 this information saved to send.  It really helps a lot.
 
 ```
-logger: 
+logger:
   default: info
-  logs: 
+  logs:
     custom_components.novafos: debug
 ```

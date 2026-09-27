@@ -7,14 +7,12 @@ from datetime import datetime
 
 import voluptuous as vol
 
-from homeassistant import (
-    config_entries,
-)
 from .const import DOMAIN
 
 from homeassistant.core import callback
 from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResult
+from homeassistant.config_entries import ConfigFlowResult
+from homeassistant import config_entries
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.const import CONF_NAME
 
@@ -58,12 +56,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Handle the initial step."""
         # Setup a name for the integration instance
         data_schema = {
             vol.Optional(CONF_NAME, default=DEFAULT_NAME): str,
             vol.Optional("use_grouped_sensors", default=False): bool,
+            vol.Optional("use_external_statistics", default=True): bool,
         }
 
         # First run - present dialog:
@@ -87,7 +86,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_manual_token_flow(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Handle options during setup. These functions are called at least twice.
         First round has user_input = None, and shows the form.  Then it is called again with user_input set.
         """
@@ -137,25 +136,46 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Handle options flow."""
 
         # First time called:
         if user_input is None:
             # Default to empty string.  This is used to make sure we can detect reasonable changes
             # to avoid hitting the API with bad data.
-            data_schema = None
             data_schema = {
-                vol.Required("access_token", default=""): str,
+                vol.Optional("access_token", default=""): str,
+                vol.Optional(
+                    "use_grouped_sensors",
+                    default=self._config_entry.options.get(
+                        "use_grouped_sensors",
+                        self._config_entry.data.get("use_grouped_sensors", False),
+                    ),
+                ): bool,
+                vol.Optional(
+                    "use_external_statistics",
+                    default=self._config_entry.options.get(
+                        "use_external_statistics",
+                        self._config_entry.data.get("use_external_statistics", True),
+                    ),
+                ): bool,
             }
 
             return self.async_show_form(
                 step_id="init", data_schema=vol.Schema(data_schema)
             )
 
-        user_input["access_token_date_updated"] = datetime.now().strftime(
-            "%Y-%m-%dT%H:%M:%S"
-        )
+        if user_input.get("access_token"):
+            user_input["access_token_date_updated"] = datetime.now().strftime(
+                "%Y-%m-%dT%H:%M:%S"
+            )
+        else:
+            user_input["access_token"] = self._config_entry.options.get(
+                "access_token", ""
+            )
+            user_input["access_token_date_updated"] = self._config_entry.options.get(
+                "access_token_date_updated", ""
+            )
         return self.async_create_entry(title="", data=user_input)
 
 

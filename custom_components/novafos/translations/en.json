@@ -12,7 +12,8 @@
             "user": {
                 "data": {
                     "name": "Sensor Name Prefix",
-                    "use_grouped_sensors" : "Enable statistics sensors grouped by day, week, month, year"
+                    "use_grouped_sensors": "Create grouped statistics sensors (deprecated)",
+                    "use_external_statistics": "Create external hourly consumption statistics for trend graphs"
                 }
             },
             "step_2": {
@@ -26,9 +27,11 @@
         "step": {
             "init": {
                 "data": {
-                    "access_token": "Insert a working access token"
+                    "access_token": "Insert a working access token (leave blank to keep current token)",
+                    "use_grouped_sensors": "Create grouped statistics sensors (deprecated)",
+                    "use_external_statistics": "Create external hourly consumption statistics for trend graphs"
                 }
             }
         }
-    }    
+    }
 }
