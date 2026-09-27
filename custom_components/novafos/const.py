@@ -91,7 +91,7 @@ HEATING_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
         suggested_display_precision=3,
         device_class=SensorDeviceClass.ENERGY,
         icon="mdi:lightning-bolt-circle",
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL,
     ),
 )
 
@@ -105,7 +105,7 @@ EXTRA_HEATING_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
         suggested_display_precision=3,
         device_class=SensorDeviceClass.ENERGY,
         icon="mdi:lightning-bolt-circle",
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL,
     ),
     NovafosSensorDescription(
         sensor_type="heating",
@@ -116,7 +116,7 @@ EXTRA_HEATING_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
         suggested_display_precision=3,
         device_class=SensorDeviceClass.ENERGY,
         icon="mdi:lightning-bolt-circle",
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL,
     ),
     NovafosSensorDescription(
         sensor_type="heating",
@@ -127,7 +127,7 @@ EXTRA_HEATING_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
         suggested_display_precision=3,
         device_class=SensorDeviceClass.ENERGY,
         icon="mdi:lightning-bolt-circle",
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL,
     ),
     NovafosSensorDescription(
         sensor_type="heating",
@@ -138,6 +138,6 @@ EXTRA_HEATING_SENSOR_TYPES: Final[tuple[NovafosSensorDescription, ...]] = (
         suggested_display_precision=3,
         device_class=SensorDeviceClass.ENERGY,
         icon="mdi:lightning-bolt-circle",
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL,
     ),
 )

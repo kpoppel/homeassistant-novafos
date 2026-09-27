@@ -122,8 +122,10 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
             statistic_id = f"sensor.{DOMAIN}_{meter_type}_statistics"
             if meter_type == "water":
                 unit = UnitOfVolume.CUBIC_METERS
+                unit_class = "volume"
             else:
                 unit = UnitOfEnergy.KILO_WATT_HOUR
+                unit_class = "energy"
 
             # TODO: Find actual last statistics where sum is not zero??
             last_stats = await get_instance(self.hass).async_add_executor_job(
@@ -162,9 +164,6 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                         self.api.get_statistics, one_year_back
                     )
                 _sum = 0.0
-                _max = data[meter_type][0]["Value"]
-                _min = data[meter_type][0]["Value"]
-                _mean = data[meter_type][0]["Value"]
             else:
                 # Fetch data this many days back
                 delta_days = 1
@@ -185,7 +184,7 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                     {statistic_id},
                     "hour",
                     None,
-                    {"sum", "max", "min", "mean"},
+                    {"sum"},
                 )
                 # Returns: defaultdict(<class 'list'>, {'sensor.novafos_water_statistics': [{'start': 1736031600.0, 'end': 1736035200.0, 'sum': 134.73000000000002}]})
                 _LOGGER.debug(f"Statistics in period: {stat}")
@@ -198,9 +197,6 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                     )
                 if statistic_id in stat:
                     _sum = cast(float, stat[statistic_id][0]["sum"])
-                    _max = cast(float, stat[statistic_id][0]["max"])
-                    _min = cast(float, stat[statistic_id][0]["min"])
-                    _mean = cast(float, stat[statistic_id][0]["mean"])
                 else:
                     # For some reason the latest statistics has nothing? Panic and get data 1 year back again!
                     # one_year_back = dt.now().replace(year=dt.now().year-1, month=1, day=1, hour=0, minute=0, second=0)
@@ -217,25 +213,17 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                     )
                     # Need to reset sum to 0.0 because we don't know the offset any more.
                     _sum = 0.0
-                    _max = data[meter_type][0]["Value"]
-                    _min = data[meter_type][0]["Value"]
-                    _mean = data[meter_type][0]["Value"]
 
             # Array of statistics points
             statistics = []
 
             # Populate statistics array
-            last_value = data[meter_type][0]["Value"]
             for val in data[meter_type]:
                 # Add timezone to dataset as Home Assistant works in UTC
                 from_time = dt_util.parse_datetime(f"{val['DateFrom']}").replace(
                     tzinfo=dt_util.get_time_zone(self.hass.config.time_zone)
                 )
                 _sum += val["Value"]
-                _max = last_value if val["Value"] < last_value else val["Value"]
-                _min = last_value if val["Value"] >= last_value else val["Value"]
-                _mean = (_min + _max) / 2
-                last_value = val["Value"]
                 # _LOGGER.debug(f"Adding: {from_time}, {val["Value"]}, {_sum}")
 
                 statistics.append(
@@ -243,9 +231,6 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                         start=from_time,
                         state=val["Value"],
                         sum=_sum,
-                        min=_min,
-                        max=_max,
-                        mean=_mean,
                     )
                 )
 
@@ -262,14 +247,15 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
             # Creates a new statistics "novafos:<name>".  This is different from the sensor.<name>
             # async_add_external_statistics(self.hass, metadata, statistics)
 
-            # Apexchart does not understand the domain:statistic noation, so we'll use an internal sensor instead.
+            # Apexchart does not understand the domain:statistic notation, so we'll use an internal sensor instead.
             # Update the sensor statistics.  Only the hourly one is needed as the sensor can then aggregate data itself.
             metadata = StatisticMetaData(
-                mean_type=StatisticMeanType.ARITHMETIC,
+                mean_type=StatisticMeanType.NONE,
                 has_sum=True,
                 name=None,
                 source=RECORDER_DOMAIN,
                 statistic_id=statistic_id,
+                unit_class=unit_class,
                 unit_of_measurement=unit,
             )
             async_import_statistics(self.hass, metadata, statistics)
@@ -285,20 +271,22 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
         # _get_meter_types returns:
         #      [{'type': 'water', 'InstallationId': 11223344, 'MeasurementPointId': 33445566, 'Unit': {'Id': 10319, 'Name': 'm³', 'Description': 'Vand', 'Decimals': 0, 'Order': 1}}]
         for meter_device in self.api.get_meter_types():
-            for grouping in grouping:
+            for group in grouping:
                 meter_type = meter_device["type"]
                 _LOGGER.debug(
                     "Generating grouped statistics data for %s meter for %s.",
                     meter_type,
-                    grouping,
+                    group,
                 )
 
-                dataset = self.api.get_grouped_statistics("water", grouping)
-                statistic_id = f"sensor.{DOMAIN}_{meter_type}_statistics_{grouping}"
+                dataset = self.api.get_grouped_statistics(meter_type, group)
+                statistic_id = f"sensor.{DOMAIN}_{meter_type}_statistics_{group}"
                 if meter_type == "water":
                     unit = UnitOfVolume.CUBIC_METERS
+                    unit_class = "volume"
                 else:
-                    unit = UnitOfEnergy.KILOWATT_HOUR
+                    unit = UnitOfEnergy.KILO_WATT_HOUR
+                    unit_class = "energy"
 
                 # Naive version - just recalculate the complete history of the sensor data
 
@@ -318,18 +306,16 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                             start=from_time,
                             state=_sum,
                             sum=_sum,
-                            min=_min,
-                            max=_max,
-                            mean=_mean,
                         )
                     )
 
                 metadata = StatisticMetaData(
-                    mean_type=StatisticMeanType.ARITHMETIC,
+                    mean_type=StatisticMeanType.NONE,
                     has_sum=True,
                     name=None,
                     source=RECORDER_DOMAIN,
                     statistic_id=statistic_id,
+                    unit_class=unit_class,
                     unit_of_measurement=unit,
                 )
                 async_import_statistics(self.hass, metadata, statistics)
