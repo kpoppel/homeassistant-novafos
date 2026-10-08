@@ -64,6 +64,8 @@ There is a thread on the forum as well: https://community.home-assistant.io/t/hi
 
 # Login methods
 
+**NOTE:** The extension currently only supports tokens retrieved from login using email and password. MitID login is not tested and reported not working at this time. (Thanks to bimmer1977 for reporting).
+
 ## Method 1: Using Chrome add-on (medium advanced, has some requirements, recommended).
 
 Install the Chrome extension from this Github repository: https://github.com/kpoppel/homeassistant-novafos-chrome-addon/releases.

@@ -239,6 +239,101 @@ async def test_import_statistics_with_existing_sum_only_history(monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("meter_types", [("heating", "water"), ("water", "heating")])
+@pytest.mark.parametrize("history", ["new", "existing", "mixed", "missing_sum"])
+async def test_statistics_fetches_once_and_preserves_meter_history(
+    monkeypatch, freezer, meter_types, history
+):
+    freezer.move_to("2026-10-08T12:00:00")
+
+    async def run_executor(function, *args):
+        return function(*args)
+
+    api = Mock()
+    api.get_meter_types.return_value = [
+        {"type": meter_type} for meter_type in meter_types
+    ]
+    api.get_available_time_series_periods.return_value = datetime(2026, 10, 5)
+    api.get_statistics.return_value = {
+        meter_type: [
+            {
+                "DateFrom": f"2026-10-{day:02d}T00:00:00",
+                "Value": 20.0 if meter_type == "heating" else 0.3,
+            }
+            for day in (5, 6, 7)
+        ]
+        for meter_type in meter_types
+    }
+    hass = SimpleNamespace(
+        async_add_executor_job=run_executor,
+        config=SimpleNamespace(time_zone="Europe/Copenhagen"),
+    )
+    coordinator = SimpleNamespace(hass=hass, api=api)
+
+    def last_statistics(hass, count, statistic_id, hourly, types):
+        meter_type = "water" if "water" in statistic_id else "heating"
+        if history == "new" or (history == "mixed" and meter_type == "heating"):
+            return {}
+        start = datetime(2026, 10, 7 if meter_type == "water" else 6)
+        return {
+            statistic_id: [
+                {
+                    "start": start.timestamp(),
+                    "end": (start + timedelta(hours=1)).timestamp(),
+                }
+            ]
+        }
+
+    def statistics_history(hass, start, end, ids, period, units, types):
+        statistic_id = next(iter(ids))
+        if history == "missing_sum" and "water" in statistic_id:
+            return {}
+        return {statistic_id: [{"sum": 10.0 if "water" in statistic_id else 100.0}]}
+
+    monkeypatch.setattr(
+        coordinator_module,
+        "get_instance",
+        Mock(return_value=SimpleNamespace(async_add_executor_job=run_executor)),
+    )
+    monkeypatch.setattr(coordinator_module, "get_last_statistics", last_statistics)
+    monkeypatch.setattr(
+        coordinator_module, "statistics_during_period", statistics_history
+    )
+    import_statistics = Mock()
+    monkeypatch.setattr(
+        coordinator_module, "async_import_statistics", import_statistics
+    )
+
+    await NovafosUpdateCoordinator._insert_statistics(coordinator, debug=False)
+
+    api.get_statistics.assert_called_once_with(
+        datetime(2026, 1, 1) if history == "missing_sum" else datetime(2026, 10, 5)
+    )
+    assert import_statistics.call_count == 2
+    imports = {
+        call.args[1]["statistic_id"]: (call.args[1], call.args[2])
+        for call in import_statistics.call_args_list
+    }
+    for meter_type in meter_types:
+        metadata, rows = imports[f"sensor.novafos_{meter_type}_statistics"]
+        existing = history != "new" and not (
+            (history == "mixed" and meter_type == "heating")
+            or (history == "missing_sum" and meter_type == "water")
+        )
+        expected_days = [6, 7] if existing and meter_type == "water" else [5, 6, 7]
+        value = 0.3 if meter_type == "water" else 20.0
+        baseline = (10.0 if meter_type == "water" else 100.0) if existing else 0.0
+        assert [row["start"].day for row in rows] == expected_days
+        assert [row["state"] for row in rows] == [value] * len(expected_days)
+        assert [row["sum"] for row in rows] == pytest.approx(
+            [baseline + value * index for index in range(1, len(expected_days) + 1)]
+        )
+        assert metadata["unit_of_measurement"] == (
+            "m³" if meter_type == "water" else "kWh"
+        )
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("day", "hour_count"),
     [(date(2026, 3, 29), 23), (date(2026, 10, 25), 25)],

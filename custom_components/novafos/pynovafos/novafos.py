@@ -96,10 +96,14 @@ class Novafos:
                 self._get_active_meters()
                 return True
             except LoginFailed as lf:
-                _LOGGER.error("Login failed during authenticate_using_access_token: %s", lf)
+                _LOGGER.error(
+                    "Login failed during authenticate_using_access_token: %s", lf
+                )
                 return False
             except HTTPFailed as hf:
-                _LOGGER.error("HTTP failure during authenticate_using_access_token: %s", hf)
+                _LOGGER.error(
+                    "HTTP failure during authenticate_using_access_token: %s", hf
+                )
                 return False
 
     def _get_customer_id(self):
@@ -113,7 +117,9 @@ class Novafos:
         try:
             response = requests.get(url, headers=headers)
         except requests.exceptions.RequestException as req_err:
-            _LOGGER.error("Request error occurred while retrieving customer id: %s", req_err)
+            _LOGGER.error(
+                "Request error occurred while retrieving customer id: %s", req_err
+            )
             # Network or other request-level error
             raise HTTPFailed from req_err
 
@@ -129,7 +135,9 @@ class Novafos:
         try:
             response.raise_for_status()
         except requests.exceptions.HTTPError as http_err:
-            _LOGGER.error("HTTP error occurred while retrieving customer id: %s", http_err)
+            _LOGGER.error(
+                "HTTP error occurred while retrieving customer id: %s", http_err
+            )
             raise HTTPFailed from http_err
         # response = requests.get(url, headers=headers)
         # self._print_json(response.json(), "Retrieved customer ID JSON response")
@@ -448,7 +456,9 @@ class Novafos:
             f"Statistics range to fetch: {from_date_input}-{end_date_input} | {days_back} day(s)"
         )
 
-        first_day = [True] * len(self._meter_data)
+        for meter_type in self._meter_data:
+            self._meter_data[meter_type] = []
+            self._meter_data_extra[meter_type] = []
         for day in duration:
             # "DateFrom":"2024-03-31T22:00:00.000Z", "DateTo":"2024-04-02T21:59:59.999Z",  <- sommertid
             # "DateFrom":"2024-10-27T23:00:00.000Z", "DateTo":"2024-10-28T22:59:59.999Z"   <- vintertid
@@ -467,10 +477,8 @@ class Novafos:
                 dateFrom=dateFrom, dateTo=dateTo, zoomLevel=self._zoom_level["Hour"]
             )
 
-            for idx, series in enumerate(time_series):
-                if first_day[idx]:
-                    meter_type = series.pop("type")
-                    first_day[idx] = False
+            for series in time_series:
+                meter_type = series["type"]
                 if series["Data"]:
                     # If the dataset returned is not empty extend dataset
                     self._meter_data[meter_type].extend(series["Data"])

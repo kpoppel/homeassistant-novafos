@@ -126,6 +126,8 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
 
     async def _insert_statistics(self, debug) -> None:
         """Update statistics when data is returned"""
+        meter_statistics = []
+        min_date = None
         # Iterate over water/heating
         # _get_meter_types returns:
         #      [{'type': 'water', 'InstallationId': 12345678, 'MeasurementPointId': 23456789, 'Unit': {'Id': 11111, 'Name': 'm³', 'Description': 'Vand', 'Decimals': 0, 'Order': 1}}]
@@ -149,9 +151,10 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.debug("Last statistics (raw): %s", last_stats)
             if not last_stats:
                 # First time we insert 365 days of data (if available)
-                min_date = await self.hass.async_add_executor_job(
-                    self.api.get_available_time_series_periods
-                )
+                if min_date is None:
+                    min_date = await self.hass.async_add_executor_job(
+                        self.api.get_available_time_series_periods
+                    )
 
                 one_year_back = dt.now().replace(
                     year=dt.now().year - 1,
@@ -171,12 +174,7 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                     one_year_back,
                     min_date,
                 )
-                if debug:
-                    data = self.api._meter_data
-                else:
-                    data = await self.hass.async_add_executor_job(
-                        self.api.get_statistics, one_year_back
-                    )
+                start = one_year_back
                 _sum = 0.0
             else:
                 # Fetch data this many days back
@@ -203,12 +201,6 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                 # Returns: defaultdict(<class 'list'>, {'sensor.novafos_water_statistics': [{'start': 1736031600.0, 'end': 1736035200.0, 'sum': 134.73000000000002}]})
                 _LOGGER.debug(f"Statistics in period: {stat}")
 
-                if debug:
-                    data = self.api._meter_data
-                else:
-                    data = await self.hass.async_add_executor_job(
-                        self.api.get_statistics, start
-                    )
                 if statistic_id in stat:
                     _sum = cast(float, stat[statistic_id][0]["sum"])
                 else:
@@ -222,12 +214,26 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                         "No last statistics detected - this is unexpected - retrieving data since %s.",
                         one_year_back,
                     )
-                    data = await self.hass.async_add_executor_job(
-                        self.api.get_statistics, one_year_back
-                    )
+                    start = one_year_back
                     # Need to reset sum to 0.0 because we don't know the offset any more.
                     _sum = 0.0
 
+            meter_statistics.append(
+                (meter_type, statistic_id, unit, unit_class, start, _sum)
+            )
+
+        if not meter_statistics:
+            return
+
+        if debug:
+            data = self.api._meter_data
+        else:
+            data = await self.hass.async_add_executor_job(
+                self.api.get_statistics,
+                min(statistics[4] for statistics in meter_statistics),
+            )
+
+        for meter_type, statistic_id, unit, unit_class, start, _sum in meter_statistics:
             # Array of statistics points
             statistics = []
 
@@ -237,6 +243,8 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                 from_time = dt_util.parse_datetime(f"{val['DateFrom']}").replace(
                     tzinfo=dt_util.get_time_zone(self.hass.config.time_zone)
                 )
+                if from_time.date() < start.date():
+                    continue
                 _sum += val["Value"]
                 # _LOGGER.debug(f"Adding: {from_time}, {val["Value"]}, {_sum}")
 

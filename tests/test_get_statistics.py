@@ -1,6 +1,8 @@
-# import pytest
+import pytest
 import requests
 from datetime import datetime, timedelta
+from unittest.mock import Mock
+from custom_components.novafos.pynovafos.novafos import Novafos
 import tests.utils
 
 
@@ -76,3 +78,54 @@ def test_statistics(mocker, data_regression, novafos) -> None:
     from_date = datetime.now() - timedelta(days=1)
     novafos.get_statistics(from_date=from_date)
     data_regression.check(novafos._meter_data)
+
+
+@pytest.mark.parametrize(
+    "meter_types", [("heating", "water"), ("water", "heating"), ("water",)]
+)
+def test_statistics_separates_meters_and_replaces_previous_fetch(meter_types, freezer):
+    freezer.move_to("2026-10-08T12:00:00")
+    api = Novafos(timezone="Europe/Copenhagen")
+    api._meter_data = {meter_type: [] for meter_type in meter_types}
+    api._meter_data_extra = {meter_type: [] for meter_type in meter_types}
+    values = {"heating": 20.0, "water": 0.3}
+
+    def time_series(dateFrom, dateTo, zoomLevel):
+        return [
+            {
+                "type": meter_type,
+                "Data": [{"DateFrom": dateFrom, "Value": values[meter_type]}],
+                "Extra": {
+                    "Sum": values[meter_type],
+                    "Avg": values[meter_type],
+                    "Max": values[meter_type],
+                    "Min": values[meter_type],
+                    "LastValidDate": dateTo,
+                },
+            }
+            for meter_type in meter_types
+        ]
+
+    api._get_all_consumption_timeseries = Mock(side_effect=time_series)
+    for from_date, expected_days in (
+        (datetime(2026, 10, 5), 3),
+        (datetime(2026, 10, 5), 3),
+        (datetime(2026, 10, 7), 1),
+        (datetime(2026, 10, 8), 0),
+    ):
+        data = api.get_statistics(from_date)
+        for meter_type in meter_types:
+            rows = data[meter_type]
+            assert len(rows) == expected_days
+            assert len({row["DateFrom"] for row in rows}) == expected_days
+            assert [row["Value"] for row in rows] == [
+                values[meter_type]
+            ] * expected_days
+            assert sum(row["Value"] for row in rows) == pytest.approx(
+                expected_days * values[meter_type]
+            )
+            assert len(api._meter_data_extra[meter_type]) == expected_days
+            assert all(
+                extra["Sum"] == values[meter_type]
+                for extra in api._meter_data_extra[meter_type]
+            )
