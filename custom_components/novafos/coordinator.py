@@ -33,7 +33,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .const import DOMAIN, meter_statistics_key
 from .legacy_statistics import async_import_grouped_statistics
 from .pynovafos.novafos import Novafos
 
@@ -98,12 +98,20 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                     "use_grouped_sensors",
                     self.entry.data.get("use_grouped_sensors", False),
                 ):
-                    await async_import_grouped_statistics(self.hass, self.api)
+                    await async_import_grouped_statistics(
+                        self.hass, self.api, entry_data=self.entry.data
+                    )
                 data = (self.api._meter_data, meter_year_data)  # , last_state)
             except Exception as ex:
                 raise UpdateFailed(f"The service is unavailable: {ex}")
         else:
-            data = (self.api.get_dummy_data(), meter_year_data)  # , None)
+            meter_type = self.entry.data.get("meter_type")
+            dummy_data = (
+                self.api.get_dummy_data(meter_type)
+                if meter_type
+                else self.api.get_dummy_data()
+            )
+            data = (dummy_data, meter_year_data)
 
         if self.entry.options.get(
             "use_external_statistics",
@@ -127,7 +135,8 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
             meter_type = meter_device["type"]
             _LOGGER.debug("Retrieving statistics data for %s meter.", meter_type)
 
-            statistic_id = f"sensor.{DOMAIN}_{meter_type}_statistics"
+            meter_key = meter_statistics_key(self.entry.data, meter_type)
+            statistic_id = f"sensor.{DOMAIN}_{meter_key}_statistics"
             if meter_type == "water":
                 unit = UnitOfVolume.CUBIC_METERS
                 unit_class = "volume"
@@ -285,9 +294,12 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
         """Import fetched hourly data and backfill older recorded statistics."""
         recorder = get_instance(self.hass)
         for meter_type in ("water", "heating"):
+            if self.entry.data.get("meter_type", meter_type) != meter_type:
+                continue
             fetched = (hourly_statistics or {}).get(meter_type, [])
-            statistic_id = f"{DOMAIN}:{meter_type}_hourly_consumption"
-            hourly_id = f"sensor.{DOMAIN}_{meter_type}_statistics"
+            meter_key = meter_statistics_key(self.entry.data, meter_type)
+            statistic_id = f"{DOMAIN}:{meter_key}_hourly_consumption"
+            hourly_id = f"sensor.{DOMAIN}_{meter_key}_statistics"
             last_stats = await recorder.async_add_executor_job(
                 get_last_statistics, self.hass, 1, statistic_id, True, {"sum"}
             )
@@ -345,7 +357,11 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                 metadata = StatisticMetaData(
                     mean_type=StatisticMeanType.ARITHMETIC,
                     has_sum=True,
-                    name=f"Novafos {meter_type} hourly consumption",
+                    name=(
+                        f"Novafos {self.entry.data['address']} {meter_type} hourly consumption"
+                        if self.entry.data.get("address")
+                        else f"Novafos {meter_type} hourly consumption"
+                    ),
                     source=DOMAIN,
                     statistic_id=statistic_id,
                     unit_class="volume" if is_water else "energy",

@@ -20,6 +20,7 @@ from .const import (
     HEATING_SENSOR_TYPES,
     EXTRA_WATER_SENSOR_TYPES,
     EXTRA_HEATING_SENSOR_TYPES,
+    meter_statistics_key,
 )
 
 from .model import NovafosSensorDescription
@@ -35,6 +36,8 @@ async def async_setup_entry(
     """Set up the sensor platform."""
     # Use the name for the unique id of each sensor. novafos_<supplierid>?
     name: str = config.data[CONF_NAME]
+    if config.data.get("address"):
+        name = f"{name} {config.data['address']}"
     coordinator: DataUpdateCoordinator = hass.data[DOMAIN][config.entry_id][
         "coordinator"
     ]
@@ -50,19 +53,27 @@ async def async_setup_entry(
     # The coordinator data is already populated and this means it is possible to 'auto-discover' which sensors to create:
     if "water" in coordinator.data[0]:
         for description in WATER_SENSOR_TYPES:
-            sensors.append(NovafosWaterSensor(name, coordinator, description))
+            sensors.append(
+                NovafosWaterSensor(name, coordinator, description, config.data)
+            )
             # _LOGGER.debug("Adding Novafos sensor %s", description.name)
         if use_grouped_sensors:
             for description in EXTRA_WATER_SENSOR_TYPES:
-                sensors.append(NovafosWaterSensor(name, coordinator, description))
+                sensors.append(
+                    NovafosWaterSensor(name, coordinator, description, config.data)
+                )
                 # _LOGGER.debug("Adding Novafos sensor %s", description.name)
 
     if "heating" in coordinator.data[0]:
         for description in HEATING_SENSOR_TYPES:
-            sensors.append(NovafosWaterSensor(name, coordinator, description))
+            sensors.append(
+                NovafosWaterSensor(name, coordinator, description, config.data)
+            )
         if use_grouped_sensors:
             for description in EXTRA_HEATING_SENSOR_TYPES:
-                sensors.append(NovafosWaterSensor(name, coordinator, description))
+                sensors.append(
+                    NovafosWaterSensor(name, coordinator, description, config.data)
+                )
 
     async_add_entities(sensors)
 
@@ -72,7 +83,7 @@ class NovafosWaterSensor(CoordinatorEntity, SensorEntity):
 
     entity_description: NovafosSensorDescription
 
-    def __init__(self, name, coordinator, description):
+    def __init__(self, name, coordinator, description, entry_data=None):
         """Initialise the coordinator"""
         super().__init__(coordinator)
 
@@ -86,6 +97,15 @@ class NovafosWaterSensor(CoordinatorEntity, SensorEntity):
         self._attr_unique_id = (
             f"{name.lower()}-{description.sensor_type}-{description.key}"
         )
+        if entry_data and "measurement_point_id" in entry_data:
+            meter_key = meter_statistics_key(entry_data, description.sensor_type)
+            key = (
+                "statistics_year"
+                if description.key == "statistic_years"
+                else description.key
+            )
+            self._attr_unique_id = f"{meter_key}-{key}"
+            self.entity_id = f"sensor.{DOMAIN}_{meter_key}_{key}"
 
         # Note: Data is stored in self.coordinator.data
 

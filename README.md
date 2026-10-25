@@ -27,10 +27,21 @@ The `novafos` component is a Home Assistant custom component for monitoring your
 Fully configurable through config flow.
   1. Head to configuration --> integration
   2. Add new and search for Novafos
-  3. Enter your name for the sensors, default is "Novafos", but if you have more, go ahead and change it.
+  3. Enter your name for the sensors, default is "Novafos". Different instances can use the same name.
   4. External hourly consumption statistics are enabled by default. The separate grouped statistics sensor option is deprecated; enable it only if you still use those entities.
-  5. Enter a working access token to get started.  This will pre-load statistics 1 calendar year back in time.
-     You can enter some random text to create the sensors without the pre-load of data.
+  5. Enter a valid access token to retrieve your addresses.
+  6. Select an address. If the account has only one address, it is selected automatically.
+  7. Select a water or heating meter at that address. A single available meter is selected automatically.
+
+Repeat **Add integration** for each meter you want to monitor. For two addresses with one water meter and one heating
+meter each, add four instances. Reuse the same access token for addresses linked to the same account.
+
+Use the sensor and statistic IDs assigned to your meter when configuring dashboards. For example:
+* Sensor entity: `sensor.novafos_12345678_44556677_water_statistics`
+* External statistic: `novafos:12345678_44556677_water_hourly_consumption`
+
+To update an access token for one instance, open its **Configure** dialog. To update all loaded instances, call
+`novafos.update_token`. If your instances use separate logins, supply `config_entry_id` to target the intended instance.
 
 Both options can be changed later via Configure. Older installations keep their grouped sensor setting; external statistics are enabled by default independently of that setting. Disabling grouped sensors stops importing their grouped history, but does not delete existing recorder history. The main hourly `sensor.*` history remains available regardless of either option.
 

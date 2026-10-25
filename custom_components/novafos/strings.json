@@ -1,6 +1,23 @@
 {
   "config": {
     "step": {
+      "manual_token_flow": {
+        "data": {
+          "access_token": "Access token"
+        }
+      },
+      "address": {
+        "title": "Address",
+        "data": {
+          "customer_id": "Address"
+        }
+      },
+      "metering": {
+        "title": "Meter",
+        "data": {
+          "measurement_point_id": "Water or heating meter"
+        }
+      },
       "user": {
         "data": {
           "name": "[%key:common::config_flow::data::name%]",
@@ -12,6 +29,10 @@
     "error": {
       "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
       "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
+      "no_addresses": "No addresses were found for this account.",
+      "no_meters": "No active water or heating meters were found at this address.",
+      "invalid_address": "Select one of the available addresses.",
+      "invalid_meter": "Select one of the available meters.",
       "unknown": "[%key:common::config_flow::error::unknown%]"
     },
     "abort": {

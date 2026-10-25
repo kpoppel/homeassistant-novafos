@@ -26,6 +26,116 @@ from custom_components.novafos.const import (
 from custom_components.novafos.coordinator import (
     NovafosUpdateCoordinator,
 )
+from custom_components.novafos.services import async_setup_services
+from custom_components.novafos.sensor import async_setup_entry as async_setup_sensors
+
+
+@pytest.mark.asyncio
+async def test_four_instances_have_independent_statistics_and_sensors(monkeypatch):
+    async def execute(function, *args):
+        return function(*args)
+
+    monkeypatch.setattr(
+        coordinator_module,
+        "get_instance",
+        Mock(return_value=SimpleNamespace(async_add_executor_job=execute)),
+    )
+    monkeypatch.setattr(
+        coordinator_module, "get_last_statistics", Mock(return_value={})
+    )
+    history = Mock(return_value={})
+    monkeypatch.setattr(coordinator_module, "statistics_during_period", history)
+    internal = Mock()
+    external = Mock()
+    monkeypatch.setattr(coordinator_module, "async_import_statistics", internal)
+    monkeypatch.setattr(legacy_statistics, "async_import_statistics", internal)
+    monkeypatch.setattr(coordinator_module, "async_add_external_statistics", external)
+    entity_ids = set()
+    unique_ids = set()
+    for customer_id in ("11", "22"):
+        for meter_type, point_id in (("water", "101"), ("heating", "102")):
+            entry = SimpleNamespace(
+                entry_id=f"{customer_id}_{point_id}",
+                options={},
+                data={
+                    "name": "Novafos",
+                    "customer_id": customer_id,
+                    "measurement_point_id": point_id,
+                    "meter_type": meter_type,
+                },
+            )
+            api = Mock()
+            api.get_meter_types.return_value = [{"type": meter_type}]
+            api.get_available_time_series_periods.return_value = datetime(2026, 1, 1)
+            api.get_statistics.return_value = {
+                meter_type: [{"DateFrom": "2026-10-01T00:00:00", "Value": 1.0}]
+            }
+            api.get_grouped_statistics.return_value = [
+                ("2026-10-01T00:00:00", 1.0, 1.0, 1.0, 1.0, 1.0)
+            ]
+            hass = SimpleNamespace(
+                config=SimpleNamespace(time_zone="Europe/Copenhagen"),
+                async_add_executor_job=execute,
+            )
+            coordinator = SimpleNamespace(hass=hass, api=api, entry=entry)
+            fetched = await NovafosUpdateCoordinator._insert_statistics(
+                coordinator, False
+            )
+            await legacy_statistics.async_import_grouped_statistics(
+                hass, api, grouping=("day",), entry_data=entry.data
+            )
+            await NovafosUpdateCoordinator._insert_external_hourly_statistics(
+                coordinator, fetched
+            )
+            entity_coordinator = Mock()
+            entity_coordinator.data = ({meter_type: []}, None)
+            hass.data = {DOMAIN: {entry.entry_id: {"coordinator": entity_coordinator}}}
+            add_entities = Mock()
+            await async_setup_sensors(hass, entry, add_entities)
+            entity = add_entities.call_args.args[0][0]
+            expected = (
+                f"sensor.novafos_{customer_id}_{point_id}_{meter_type}_statistics"
+            )
+            assert entity.entity_id == expected
+            entity_ids.add(entity.entity_id)
+            unique_ids.add(entity.unique_id)
+            assert internal.call_args_list[-2].args[1]["statistic_id"] == expected
+            assert internal.call_args.args[1]["statistic_id"] == f"{expected}_day"
+            assert external.call_args.args[1]["statistic_id"] == (
+                f"novafos:{customer_id}_{point_id}_{meter_type}_hourly_consumption"
+            )
+            assert history.call_args.args[3] == {expected}
+    assert len(entity_ids) == len(unique_ids) == external.call_count == 4
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("target", [None, "entry-1"])
+async def test_token_service_refreshes_all_or_selected_entry(target):
+    coordinators = {
+        f"entry-{index}": SimpleNamespace(async_refresh=AsyncMock())
+        for index in range(4)
+    }
+    services = Mock()
+    services.has_service.return_value = False
+    hass = SimpleNamespace(
+        services=services,
+        data={
+            DOMAIN: {key: {"coordinator": value} for key, value in coordinators.items()}
+        },
+    )
+    await async_setup_services(hass, coordinators["entry-0"])
+    handler = services.async_register.call_args.args[2]
+    data = {"access_token": "new-token", "access_token_date_updated": ""}
+    if target is not None:
+        data["config_entry_id"] = target
+    await handler(SimpleNamespace(data=data))
+    for entry_id, coordinator in coordinators.items():
+        if target is None or entry_id == target:
+            assert coordinator.access_token == "new-token"
+            assert coordinator.access_token_date_updated
+            coordinator.async_refresh.assert_awaited_once()
+        else:
+            coordinator.async_refresh.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -167,7 +277,7 @@ async def test_import_statistics_with_existing_sum_only_history(monkeypatch):
         async_add_executor_job=run_executor,
         config=SimpleNamespace(time_zone="Europe/Copenhagen"),
     )
-    coordinator = SimpleNamespace(hass=hass, api=api)
+    coordinator = SimpleNamespace(hass=hass, api=api, entry=SimpleNamespace(data={}))
     monkeypatch.setattr(
         coordinator_module,
         "get_instance",
@@ -274,7 +384,7 @@ async def test_statistics_fetches_once_and_preserves_meter_history(
         async_add_executor_job=run_executor,
         config=SimpleNamespace(time_zone="Europe/Copenhagen"),
     )
-    coordinator = SimpleNamespace(hass=hass, api=api)
+    coordinator = SimpleNamespace(hass=hass, api=api, entry=SimpleNamespace(data={}))
 
     def last_statistics(hass, count, statistic_id, hourly, types):
         meter_type = "water" if "water" in statistic_id else "heating"
@@ -379,7 +489,7 @@ async def test_external_hourly_statistics_backfill_handles_dst(
     hass = SimpleNamespace(config=SimpleNamespace(time_zone="Europe/Copenhagen"))
     api = Mock()
     api.get_meter_types.return_value = [{"type": "water"}, {"type": "heating"}]
-    coordinator = SimpleNamespace(hass=hass, api=api)
+    coordinator = SimpleNamespace(hass=hass, api=api, entry=SimpleNamespace(data={}))
     monkeypatch.setattr(
         coordinator_module,
         "get_instance",
@@ -638,7 +748,7 @@ async def test_external_consumption_trends_across_calendar_boundaries(
         ],
     )
     await hass.async_add_executor_job(recorder.block_till_done)
-    coordinator = SimpleNamespace(hass=hass)
+    coordinator = SimpleNamespace(hass=hass, entry=SimpleNamespace(data={}))
     await NovafosUpdateCoordinator._insert_external_hourly_statistics(coordinator)
     await hass.async_add_executor_job(recorder.block_till_done)
 

@@ -16,6 +16,14 @@ DOMAIN = "novafos"
 # Default name for sensor prefix texts (possibly other things)
 DEFAULT_NAME = "Novafos"
 
+
+def meter_statistics_key(data, meter_type):
+    """Scope new entries to a customer and meter, preserving legacy IDs."""
+    if "customer_id" in data and "measurement_point_id" in data:
+        return f"{data['customer_id']}_{data['measurement_point_id']}_{meter_type}"
+    return meter_type
+
+
 # NOTE:
 #  All consumption data can be derived from the statistics sensor.
 #  The sensor will always have state "unknown" because data is only relevant in the past.

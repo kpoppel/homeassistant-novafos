@@ -1,6 +1,13 @@
 # Service ID
 update_token:
+  description: Update all loaded Novafos instances, or one selected instance.
   fields:
+    config_entry_id:
+      name: Integration instance
+      description: Optional. Select an instance when using separate logins; otherwise all loaded instances receive the token.
+      selector:
+        config_entry:
+          integration: novafos
     access_token:
       required: true
       example: "ey... long token"

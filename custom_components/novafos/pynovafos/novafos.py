@@ -28,10 +28,16 @@ class Novafos:
     Primary exported interface for KMD API wrapper.
     """
 
-    def __init__(self, timezone):
+    def __init__(self, timezone, customer_id=None, measurement_point_id=None):
         self._api_url = "https://easy-energy-plugin-api.kmd.dk"
         self.tz = ZoneInfo(timezone)
 
+        self._selected_customer_id = (
+            str(customer_id) if customer_id is not None else None
+        )
+        self._selected_measurement_point_id = (
+            str(measurement_point_id) if measurement_point_id is not None else None
+        )
         self._access_token = ""
         self._customer_id = ""
         self._customer_number = ""
@@ -70,12 +76,6 @@ class Novafos:
                 len(access_token),
             )
             return False
-        _LOGGER.debug(
-            "Access token set to: '%s' at date: '%s'",
-            self._access_token,
-            self._access_token_date_updated,
-        )
-
         # Check token age
         now = datetime.now()
         # Allow 45 minutes since the last token update.  If updating after this point, disallow API accesses.
@@ -106,8 +106,12 @@ class Novafos:
                 )
                 return False
 
-    def _get_customer_id(self):
-        # Need to retrieve the customer ID from the user profile to fetch data.
+    def get_customers(self, access_token=None):
+        """Return the customers and addresses accessible to this login."""
+        if access_token is not None:
+            if len(access_token) < 1200:
+                raise LoginFailed("Invalid access token")
+            self._access_token = "Bearer " + access_token
         headers = {
             "Authorization": self._access_token,
         }
@@ -144,16 +148,43 @@ class Novafos:
         # Parse and validate JSON payload
         try:
             resp_json = response.json()
-            self._customer_id = f"{resp_json['Customers'][0]['Id']}"
-            self._customer_number = f"{resp_json['Customers'][0]['Number']}"
+            customers = resp_json["Customers"]
+            if not isinstance(customers, list):
+                raise ValueError("Customers must be a list")
         except Exception as json_err:
             _LOGGER.error("Failed to parse customer id response: %s", json_err)
             raise HTTPFailed from json_err
+        return customers
+
+    def _get_customer_id(self):
+        customers = self.get_customers()
+        self._customer_id = ""
+        self._customer_number = ""
+        try:
+            if self._selected_customer_id is None:
+                customer = customers[0]
+            else:
+                customer = next(
+                    customer
+                    for customer in customers
+                    if str(customer["Id"]) == self._selected_customer_id
+                )
+            self._customer_id = str(customer["Id"])
+            self._customer_number = str(customer["Number"])
+        except (IndexError, KeyError, StopIteration, TypeError) as error:
+            raise HTTPFailed("Selected customer is unavailable") from error
         _LOGGER.debug(
             "Retrieved customer_id, number: %s, %s",
             self._customer_id,
             self._customer_number,
         )
+
+    def get_meters(self, customer_id):
+        """Discover active water and heating meters for one customer."""
+        self._selected_customer_id = str(customer_id)
+        self._get_customer_id()
+        self._get_active_meters()
+        return self.get_meter_types()
 
     def _get_active_meters(self):
         """
@@ -191,13 +222,29 @@ class Novafos:
 
         url = f"{self._api_url}/api/meter/customerActiveMeters"
 
-        response = requests.post(url, data=data, headers=headers)
+        try:
+            response = requests.post(url, data=data, headers=headers)
+            if response.status_code in (401, 403):
+                raise LoginFailed("Invalid or expired access token")
+            response.raise_for_status()
+            response_json = response.json()
+            if not isinstance(response_json, list):
+                raise ValueError("Meters must be a list")
+        except (requests.exceptions.RequestException, ValueError) as error:
+            raise HTTPFailed("Failed to retrieve active meters") from error
         # NOTE: Failure may happen right here whenever the API is updated with new headers and what not.
         # self._print_json(response.json(), "Get active meters response")
 
-        response_json = response.json()
         self._active_meters = []
+        self._meter_data = {}
+        self._meter_data_extra = {}
         for meter in response_json:
+            if (
+                self._selected_measurement_point_id is not None
+                and str(meter["MeasurementPointId"])
+                != self._selected_measurement_point_id
+            ):
+                continue
             """ Pick up active water measuring meters """
             if meter["IsActive"] and meter["ConsumptionTypeId"] == 6:
                 # Water type
@@ -221,6 +268,8 @@ class Novafos:
                 self._meter_data["heating"] = []
                 self._meter_data_extra["heating"] = []
                 self._active_meters.append(active)
+        if self._selected_measurement_point_id is not None and not self._active_meters:
+            raise HTTPFailed("Selected meter is unavailable")
         _LOGGER.debug("Got active (water/heating) meters : %s", self._active_meters)
 
     def get_meter_types(self):
@@ -262,7 +311,20 @@ class Novafos:
         )
 
         # Entry with RangeType 0 is for the specific meter, and is the one we care about.  It has the actual earliest date of data available.
-        self._earliest_data_date = datetime.fromisoformat(result_json[0]["MinDate"])
+        period = result_json[0]
+        if self._selected_measurement_point_id is not None:
+            period = next(
+                (
+                    item
+                    for item in result_json
+                    if str(item["MeasurementPointId"])
+                    == self._selected_measurement_point_id
+                ),
+                next((item for item in result_json if item["RangeType"] == 1), None),
+            )
+            if period is None:
+                raise HTTPFailed("Selected meter has no available periods")
+        self._earliest_data_date = datetime.fromisoformat(period["MinDate"])
         # self._earliest_data_date = self._local_str_to_utc(result_json[0]["MinDate"])
         return self._earliest_data_date
 
@@ -806,5 +868,5 @@ class Novafos:
         _LOGGER.debug(f"Grouped stats: {grouping_stats}")
         return grouping_stats
 
-    def get_dummy_data(self):
-        return {"water": [{"DateFrom": None, "Value": None}]}
+    def get_dummy_data(self, meter_type="water"):
+        return {meter_type: [{"DateFrom": None, "Value": None}]}

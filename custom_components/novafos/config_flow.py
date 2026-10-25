@@ -17,6 +17,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.const import CONF_NAME
 
 from .const import DEFAULT_NAME
+from .pynovafos.novafos import HTTPFailed, LoginFailed, Novafos
 
 import logging
 
@@ -71,13 +72,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 step_id="user", data_schema=vol.Schema(data_schema)
             )
 
-        # Assign a unique ID to the flow and abort the flow
-        # if another flow with the same unique ID is in progress
-        await self.async_set_unique_id(f"{user_input[CONF_NAME]}")
-
-        # Abort the flow if a config entry with the same unique ID exists
-        self._abort_if_unique_id_configured()
-
         # Regardless of using manual token flow or service action we require a valid token to seed the sensor setup.
         # Could have done this in a nother way though:  checkbox to select water, heating or both and a static setup.
         self.data = user_input
@@ -87,34 +81,124 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_manual_token_flow(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle options during setup. These functions are called at least twice.
-        First round has user_input = None, and shows the form.  Then it is called again with user_input set.
-        """
-
-        # First time called:
-        if user_input is None:
-            # Default to empty string.  This is used to make sure we can detect reasonable changes
-            # to avoid hitting the API with bad data.
-            data_schema = {
-                vol.Required("access_token", default=""): str,
-            }
-            return self.async_show_form(
-                step_id="manual_token_flow",  # <- this matches the function name..
-                data_schema=vol.Schema(data_schema),
-            )
-
-        # Validate - not implemented
-        _LOGGER.debug(user_input)
-        _LOGGER.debug(self.data)
-        _LOGGER.debug(self.options)
-        # Anyway, set options related to the chosen login method
-        self.options["access_token"] = user_input.get("access_token")
-        # Hidden field:
-        self.options["access_token_date_updated"] = datetime.now().strftime(
-            "%Y-%m-%dT%H:%M:%S"
+        """Validate a token and discover the available addresses."""
+        errors = {}
+        if user_input is not None:
+            self._api = Novafos(timezone=self.hass.config.time_zone)
+            try:
+                customers = await self.hass.async_add_executor_job(
+                    self._api.get_customers, user_input["access_token"]
+                )
+                self._customers = {
+                    str(customer["Id"]): customer for customer in customers
+                }
+            except LoginFailed:
+                errors["base"] = "invalid_auth"
+            except (HTTPFailed, KeyError, TypeError):
+                errors["base"] = "cannot_connect"
+            else:
+                if self._customers:
+                    self.options["access_token"] = user_input["access_token"]
+                    self.options["access_token_date_updated"] = datetime.now().strftime(
+                        "%Y-%m-%dT%H:%M:%S"
+                    )
+                    return await self.async_step_address()
+                errors["base"] = "no_addresses"
+        return self.async_show_form(
+            step_id="manual_token_flow",
+            data_schema=vol.Schema({vol.Required("access_token"): str}),
+            errors=errors,
         )
-        return self.async_create_entry(
-            title=f"Novafos: {self.data['name']}", data=self.data, options=self.options
+
+    async def async_step_address(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Select an address, automatically selecting the only address."""
+        errors = {}
+        if user_input is None and len(self._customers) == 1:
+            user_input = {"customer_id": next(iter(self._customers))}
+        if user_input is not None:
+            customer_id = user_input["customer_id"]
+            if customer_id not in self._customers:
+                errors["base"] = "invalid_address"
+            else:
+                try:
+                    meters = await self.hass.async_add_executor_job(
+                        self._api.get_meters, customer_id
+                    )
+                except LoginFailed:
+                    return self.async_show_form(
+                        step_id="manual_token_flow",
+                        data_schema=vol.Schema({vol.Required("access_token"): str}),
+                        errors={"base": "invalid_auth"},
+                    )
+                except HTTPFailed:
+                    errors["base"] = "cannot_connect"
+                else:
+                    self._meters = {
+                        str(meter["MeasurementPointId"]): meter for meter in meters
+                    }
+                    if self._meters:
+                        customer = self._customers[customer_id]
+                        self.data["customer_id"] = customer_id
+                        self.data["address"] = (
+                            customer.get("StreetAddress") or customer_id
+                        )
+                        return await self.async_step_metering()
+                    errors["base"] = "no_meters"
+        addresses = {
+            customer_id: ", ".join(
+                str(part)
+                for part in (
+                    customer.get("StreetAddress"),
+                    customer.get("City"),
+                    customer.get("Number"),
+                )
+                if part is not None and part != ""
+            )
+            or customer_id
+            for customer_id, customer in self._customers.items()
+        }
+        return self.async_show_form(
+            step_id="address",
+            data_schema=vol.Schema({vol.Required("customer_id"): vol.In(addresses)}),
+            errors=errors,
+        )
+
+    async def async_step_metering(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Select one water or heating measurement point."""
+        errors = {}
+        if user_input is None and len(self._meters) == 1:
+            user_input = {"measurement_point_id": next(iter(self._meters))}
+        if user_input is not None:
+            measurement_point_id = user_input["measurement_point_id"]
+            if measurement_point_id not in self._meters:
+                errors["base"] = "invalid_meter"
+            else:
+                meter = self._meters[measurement_point_id]
+                await self.async_set_unique_id(
+                    f"{self.data['customer_id']}_{measurement_point_id}"
+                )
+                self._abort_if_unique_id_configured()
+                self.data["measurement_point_id"] = measurement_point_id
+                self.data["meter_type"] = meter["type"]
+                return self.async_create_entry(
+                    title=f"{self.data['name']}: {self.data['address']} ({meter['type']})",
+                    data=self.data,
+                    options=self.options,
+                )
+        meters = {
+            point_id: f"{meter['type'].title()} ({point_id})"
+            for point_id, meter in self._meters.items()
+        }
+        return self.async_show_form(
+            step_id="metering",
+            data_schema=vol.Schema(
+                {vol.Required("measurement_point_id"): vol.In(meters)}
+            ),
+            errors=errors,
         )
 
     @staticmethod

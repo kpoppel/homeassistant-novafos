@@ -12,13 +12,13 @@ from homeassistant.components.recorder.statistics import async_import_statistics
 from homeassistant.const import UnitOfEnergy, UnitOfVolume
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .const import DOMAIN, meter_statistics_key
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_import_grouped_statistics(
-    hass, api, grouping=("day", "week", "month", "year")
+    hass, api, grouping=("day", "week", "month", "year"), *, entry_data=None
 ) -> None:
     """Import statistics for the deprecated grouped sensor entities."""
     for meter_device in api.get_meter_types():
@@ -31,7 +31,8 @@ async def async_import_grouped_statistics(
             )
 
             dataset = api.get_grouped_statistics(meter_type, group)
-            statistic_id = f"sensor.{DOMAIN}_{meter_type}_statistics_{group}"
+            meter_key = meter_statistics_key(entry_data or {}, meter_type)
+            statistic_id = f"sensor.{DOMAIN}_{meter_key}_statistics_{group}"
             if meter_type == "water":
                 unit = UnitOfVolume.CUBIC_METERS
                 unit_class = "volume"

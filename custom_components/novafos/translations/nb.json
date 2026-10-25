@@ -6,6 +6,10 @@
         "error": {
             "cannot_connect": "Kunne ikke få forbindelse",
             "invalid_auth": "Kunne ikke logge ind",
+            "no_addresses": "Der blev ikke fundet nogen adresser for denne konto.",
+            "no_meters": "Der blev ikke fundet aktive vand- eller varmemålere på adressen.",
+            "invalid_address": "Vælg en af de tilgængelige adresser.",
+            "invalid_meter": "Vælg en af de tilgængelige målere.",
             "unknown": "Uventet fejl"
         },
         "step": {
@@ -16,7 +20,19 @@
                     "use_external_statistics": "Opret eksterne timestatistikker til forbrugstendenser"
                 }
             },
-            "step_2": {
+            "address": {
+                "title": "Adresse",
+                "data": {
+                    "customer_id": "Adresse"
+                }
+            },
+            "metering": {
+                "title": "Måler",
+                "data": {
+                    "measurement_point_id": "Vand- eller varmemåler"
+                }
+            },
+            "manual_token_flow": {
                 "data": {
                     "access_token": "Indsæt adgangstoken til opsætning eller opdatering af sensorer",
                     "use_grouped_sensors": "Brug ekstra statistiksenorer til dag, uge, måned og år (udfases)",
