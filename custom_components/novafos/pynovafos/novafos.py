@@ -390,10 +390,10 @@ class Novafos:
             "type": metering_device["type"],
             "Data": series_data,
             "Extra": {
-                "Sum": result_json["Total"]["Value"],
-                "Avg": result_json["Average"]["Value"],
-                "Max": result_json["Maximum"]["Value"],
-                "Min": result_json["Minimum"]["Value"],
+                "Sum": (result_json.get("Total") or {}).get("Value"),
+                "Avg": (result_json.get("Average") or {}).get("Value"),
+                "Max": (result_json.get("Maximum") or {}).get("Value"),
+                "Min": (result_json.get("Minimum") or {}).get("Value"),
                 "LastValidDate": last_valid_date,
             },
         }

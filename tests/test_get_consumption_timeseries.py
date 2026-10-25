@@ -1,4 +1,5 @@
 # import pytest
+import pytest
 import requests
 import tests.utils
 
@@ -53,3 +54,36 @@ def test_get_all_compsumption_timeseries(mocker, data_regression, novafos):
 
     actuals = novafos._get_all_consumption_timeseries("2024-12-01", "2024-12-31", 3)
     data_regression.check(actuals)
+
+
+@pytest.mark.parametrize("aggregate", ["Total", "Average", "Maximum", "Minimum", "all"])
+def test_consumption_timeseries_handles_null_aggregates(mocker, novafos, aggregate):
+    prepare_active_meters(mocker, novafos)
+    payload = {
+        "Series": [],
+        "SheetName": None,
+        **{
+            name: None if aggregate in (name, "all") else {"Value": 0.0}
+            for name in ("Total", "Average", "Maximum", "Minimum")
+        },
+    }
+    mocker.patch("requests.post").return_value.json.return_value = payload
+
+    actual = novafos._get_consumption_timeseries(
+        novafos._active_meters[0], "2026-10-24", "2026-10-24", 3
+    )
+
+    assert actual == {
+        "type": "water",
+        "Data": [],
+        "Extra": {
+            key: None if aggregate in (name, "all") else 0.0
+            for key, name in (
+                ("Sum", "Total"),
+                ("Avg", "Average"),
+                ("Max", "Maximum"),
+                ("Min", "Minimum"),
+            )
+        }
+        | {"LastValidDate": ""},
+    }
