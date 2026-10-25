@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock, Mock
 from zoneinfo import ZoneInfo
 
 import pytest
-
 from homeassistant.components.recorder import statistics as recorder_statistics
 from homeassistant.components.recorder.models import (
     StatisticData,
@@ -17,13 +16,12 @@ from homeassistant.components.recorder.statistics import valid_statistic_id
 from homeassistant.components.sensor import SensorStateClass
 
 from custom_components.novafos import coordinator as coordinator_module
-from custom_components.novafos import legacy_statistics
-from custom_components.novafos import update_listener
+from custom_components.novafos import legacy_statistics, update_listener
 from custom_components.novafos.config_flow import OptionsFlowHandler
-from custom_components.novafos.const import DOMAIN
 from custom_components.novafos.const import (
-    HEATING_SENSOR_TYPES,
+    DOMAIN,
     EXTRA_HEATING_SENSOR_TYPES,
+    HEATING_SENSOR_TYPES,
 )
 from custom_components.novafos.coordinator import (
     NovafosUpdateCoordinator,
@@ -31,6 +29,7 @@ from custom_components.novafos.coordinator import (
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("authenticated", [True, False])
 @pytest.mark.parametrize(
     ("data", "options", "legacy", "external"),
     [
@@ -57,13 +56,15 @@ from custom_components.novafos.coordinator import (
     ],
 )
 async def test_statistics_options_are_independent(
-    data, options, legacy, external, monkeypatch
+    data, options, legacy, external, authenticated, monkeypatch
 ):
     async def run_executor(function, *args):
         return function(*args)
 
+    recorder = SimpleNamespace(async_block_till_done=AsyncMock())
+    monkeypatch.setattr(coordinator_module, "get_instance", Mock(return_value=recorder))
     api = Mock()
-    api.authenticate_using_access_token.return_value = True
+    api.authenticate_using_access_token.return_value = authenticated
     api.get_year_data.return_value = {}
     api._meter_data = {}
     import_grouped = AsyncMock()
@@ -76,15 +77,20 @@ async def test_statistics_options_are_independent(
         entry=SimpleNamespace(data=data, options=options),
         access_token="",
         access_token_date_updated="",
-        _insert_statistics=AsyncMock(),
+        _insert_statistics=AsyncMock(return_value={"heating": []}),
         _insert_external_hourly_statistics=AsyncMock(),
     )
 
     await NovafosUpdateCoordinator._async_update_data(coordinator)
 
-    coordinator._insert_statistics.assert_awaited_once()
-    assert import_grouped.await_count == int(legacy)
+    assert coordinator._insert_statistics.await_count == int(authenticated)
+    assert import_grouped.await_count == int(legacy and authenticated)
     assert coordinator._insert_external_hourly_statistics.await_count == int(external)
+    recorder.async_block_till_done.assert_not_awaited()
+    if external:
+        coordinator._insert_external_hourly_statistics.assert_awaited_once_with(
+            {"heating": []} if authenticated else None
+        )
 
 
 @pytest.mark.asyncio
@@ -304,7 +310,9 @@ async def test_statistics_fetches_once_and_preserves_meter_history(
         coordinator_module, "async_import_statistics", import_statistics
     )
 
-    await NovafosUpdateCoordinator._insert_statistics(coordinator, debug=False)
+    hourly_statistics = await NovafosUpdateCoordinator._insert_statistics(
+        coordinator, debug=False
+    )
 
     api.get_statistics.assert_called_once_with(
         datetime(2026, 1, 1) if history == "missing_sum" else datetime(2026, 10, 5)
@@ -316,6 +324,7 @@ async def test_statistics_fetches_once_and_preserves_meter_history(
     }
     for meter_type in meter_types:
         metadata, rows = imports[f"sensor.novafos_{meter_type}_statistics"]
+        assert hourly_statistics[meter_type] is rows
         existing = history != "new" and not (
             (history == "mixed" and meter_type == "heating")
             or (history == "missing_sum" and meter_type == "water")
@@ -427,8 +436,9 @@ async def test_external_hourly_statistics_backfill_handles_dst(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("authenticated", [True, False])
 async def test_external_hourly_statistics_recorder_roundtrip(
-    async_setup_recorder_instance, hass
+    async_setup_recorder_instance, hass, authenticated
 ):
     recorder = await async_setup_recorder_instance(hass)
     start = datetime(2026, 9, 21, tzinfo=ZoneInfo(hass.config.time_zone)).astimezone(
@@ -454,30 +464,58 @@ async def test_external_hourly_statistics_recorder_roundtrip(
                 state=1.0 if hour < 24 else 2.0,
                 sum=hour + 1 if hour < 24 else 24 + (hour - 23) * 2,
             )
-            for hour in range(48)
+            for hour in range(24 if authenticated else 48)
         ],
     )
     await hass.async_add_executor_job(recorder.block_till_done)
 
     api = Mock()
-    api.authenticate_using_access_token.return_value = False
+    api.authenticate_using_access_token.return_value = authenticated
     api.get_dummy_data.return_value = {}
+    api.get_year_data.return_value = {}
+    api._meter_data = {}
+    fetched = {
+        "water": [
+            StatisticData(
+                start=start + timedelta(hours=hour),
+                state=2.0,
+                sum=24 + (hour - 23) * 2,
+            )
+            for hour in range(24, 48)
+        ]
+    }
     coordinator = SimpleNamespace(
         hass=hass,
         api=api,
-        entry=SimpleNamespace(data={"use_grouped_sensors": True}, options={}),
+        entry=SimpleNamespace(data={"use_grouped_sensors": False}, options={}),
         access_token="",
         access_token_date_updated="",
+        _insert_statistics=AsyncMock(return_value=fetched),
     )
 
-    async def insert_external():
-        await NovafosUpdateCoordinator._insert_external_hourly_statistics(coordinator)
+    async def insert_external(hourly_statistics=None):
+        await NovafosUpdateCoordinator._insert_external_hourly_statistics(
+            coordinator, hourly_statistics
+        )
 
     coordinator._insert_external_hourly_statistics = insert_external
     await NovafosUpdateCoordinator._async_update_data(coordinator)
     await hass.async_add_executor_job(recorder.block_till_done)
+    assert coordinator._insert_statistics.await_count == int(authenticated)
     api.get_meter_types.assert_not_called()
     api.get_statistics.assert_not_called()
+
+    internal = await recorder.async_add_executor_job(
+        recorder_statistics.statistics_during_period,
+        hass,
+        start,
+        None,
+        {hourly_id},
+        "hour",
+        None,
+        {"state", "sum"},
+    )
+    assert len(internal[hourly_id]) == (24 if authenticated else 48)
 
     result = await hass.async_add_executor_job(
         recorder_statistics.statistics_during_period,

@@ -2,44 +2,40 @@
 
 from __future__ import annotations
 
-from .pynovafos.novafos import Novafos
-
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.exceptions import HomeAssistantError
-
-from datetime import datetime as dt
-from datetime import timedelta
-
-
-from .const import DOMAIN
-from .legacy_statistics import async_import_grouped_statistics
-from homeassistant.components.recorder import DOMAIN as RECORDER_DOMAIN, get_instance
-from homeassistant.components.recorder.models import (
-    StatisticData,
-    StatisticMetaData,
-    StatisticMeanType,
-)
-from homeassistant.components.recorder.statistics import (
-    get_last_statistics,
-    statistics_during_period,
-    async_import_statistics,
-    async_add_external_statistics,
-)
-from homeassistant.util import dt as dt_util
-from homeassistant.const import UnitOfVolume, UnitOfEnergy
-from typing import cast
-
 # If debugging, use pre-seeded data:
 # from .pynovafos.sample_data import (
 #     get_active_meters,
 #     get_year_sample_data,
 #     get_year_sample_data_extra,
 # )
-
 import logging
+from datetime import datetime as dt
+from datetime import timedelta
+from typing import cast
+
+from homeassistant.components.recorder import DOMAIN as RECORDER_DOMAIN
+from homeassistant.components.recorder import get_instance
+from homeassistant.components.recorder.models import (
+    StatisticData,
+    StatisticMeanType,
+    StatisticMetaData,
+)
+from homeassistant.components.recorder.statistics import (
+    async_add_external_statistics,
+    async_import_statistics,
+    get_last_statistics,
+    statistics_during_period,
+)
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import UnitOfEnergy, UnitOfVolume
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
+
+from .const import DOMAIN
+from .legacy_statistics import async_import_grouped_statistics
+from .pynovafos.novafos import Novafos
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -63,15 +59,9 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
         # Attribute data for the sensors
         self.attrib_data = {"year_total": None}
         # Need local version here to enable updating via action service calls
-        self.access_token = (
-            self.entry.options["access_token"]
-            if "access_token" in self.entry.options
-            else ""
-        )
-        self.access_token_date_updated = (
-            self.entry.options["access_token_date_updated"]
-            if "access_token_date_updated" in self.entry.options
-            else ""
+        self.access_token = self.entry.options.get("access_token", "")
+        self.access_token_date_updated = self.entry.options.get(
+            "access_token_date_updated", ""
         )
 
         super().__init__(hass, _LOGGER, name="Novafos")
@@ -89,6 +79,7 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
         #     self.api._meter_data_extra = get_year_sample_data_extra()
 
         meter_year_data = None
+        hourly_statistics = None
         if await self.hass.async_add_executor_job(
             self.api.authenticate_using_access_token,
             self.access_token,
@@ -102,7 +93,7 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                     self.api.get_year_data
                 )
                 # last_state = await self._insert_statistics(debug=debug)
-                await self._insert_statistics(debug=debug)
+                hourly_statistics = await self._insert_statistics(debug=debug)
                 if self.entry.options.get(
                     "use_grouped_sensors",
                     self.entry.data.get("use_grouped_sensors", False),
@@ -118,14 +109,15 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
             "use_external_statistics",
             self.entry.data.get("use_external_statistics", True),
         ):
-            await self._insert_external_hourly_statistics()
+            await self._insert_external_hourly_statistics(hourly_statistics)
 
         # The data is stored in the coordinator as a .data field.
         _LOGGER.debug("Returning from Coordinator with data: %s", data)
         return data
 
-    async def _insert_statistics(self, debug) -> None:
+    async def _insert_statistics(self, debug) -> dict[str, list[StatisticData]]:
         """Update statistics when data is returned"""
+        hourly_statistics = {}
         meter_statistics = []
         min_date = None
         # Iterate over water/heating
@@ -166,8 +158,7 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                 )
 
                 # Don't go back further than the available data:
-                if min_date > one_year_back:
-                    one_year_back = min_date
+                one_year_back = max(one_year_back, min_date)
 
                 _LOGGER.debug(
                     "No last statistics detected - retrieving data since %s. Your earliest data is from %s. This could take a while.",
@@ -223,7 +214,7 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
             )
 
         if not meter_statistics:
-            return
+            return hourly_statistics
 
         if debug:
             data = self.api._meter_data
@@ -281,14 +272,20 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                 unit_of_measurement=unit,
             )
             async_import_statistics(self.hass, metadata, statistics)
+            hourly_statistics[meter_type] = statistics
 
             # Could return last state for a sensor - but the sensor state ruins the statistics.
             # return statistics[-1]['state']
 
-    async def _insert_external_hourly_statistics(self) -> None:
-        """Backfill and refresh arithmetic statistics from recorded hourly data."""
+        return hourly_statistics
+
+    async def _insert_external_hourly_statistics(
+        self, hourly_statistics: dict[str, list[StatisticData]] | None = None
+    ) -> None:
+        """Import fetched hourly data and backfill older recorded statistics."""
         recorder = get_instance(self.hass)
         for meter_type in ("water", "heating"):
+            fetched = (hourly_statistics or {}).get(meter_type, [])
             statistic_id = f"{DOMAIN}:{meter_type}_hourly_consumption"
             hourly_id = f"sensor.{DOMAIN}_{meter_type}_statistics"
             last_stats = await recorder.async_add_executor_job(
@@ -305,7 +302,7 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                 statistics_during_period,
                 self.hass,
                 start,
-                None,
+                min(row["start"] for row in fetched) if fetched else None,
                 {hourly_id},
                 "hour",
                 None,
@@ -321,6 +318,21 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                 statistics.append(
                     StatisticData(
                         start=dt.fromtimestamp(timestamp, dt_util.UTC),
+                        min=value,
+                        max=value,
+                        mean=value,
+                        sum=running_sum,
+                    )
+                )
+
+            for row in fetched:
+                value = row.get("state")
+                running_sum = row.get("sum")
+                if value is None or running_sum is None:
+                    continue
+                statistics.append(
+                    StatisticData(
+                        start=dt_util.as_utc(row["start"]),
                         min=value,
                         max=value,
                         mean=value,
