@@ -62,7 +62,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Setup a name for the integration instance
         data_schema = {
             vol.Optional(CONF_NAME, default=DEFAULT_NAME): str,
-            vol.Optional("use_grouped_sensors", default=False): bool,
             vol.Optional("use_external_statistics", default=True): bool,
         }
 
@@ -229,13 +228,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             # to avoid hitting the API with bad data.
             data_schema = {
                 vol.Optional("access_token", default=""): str,
-                vol.Optional(
-                    "use_grouped_sensors",
-                    default=self._config_entry.options.get(
-                        "use_grouped_sensors",
-                        self._config_entry.data.get("use_grouped_sensors", False),
-                    ),
-                ): bool,
                 vol.Optional(
                     "use_external_statistics",
                     default=self._config_entry.options.get(

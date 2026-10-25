@@ -16,11 +16,10 @@ from homeassistant.components.recorder.statistics import valid_statistic_id
 from homeassistant.components.sensor import SensorStateClass
 
 from custom_components.novafos import coordinator as coordinator_module
-from custom_components.novafos import legacy_statistics, update_listener
+from custom_components.novafos import update_listener
 from custom_components.novafos.config_flow import OptionsFlowHandler
 from custom_components.novafos.const import (
     DOMAIN,
-    EXTRA_HEATING_SENSOR_TYPES,
     HEATING_SENSOR_TYPES,
 )
 from custom_components.novafos.coordinator import (
@@ -28,6 +27,29 @@ from custom_components.novafos.coordinator import (
 )
 from custom_components.novafos.services import async_setup_services
 from custom_components.novafos.sensor import async_setup_entry as async_setup_sensors
+
+
+@pytest.mark.asyncio
+async def test_saved_grouped_setting_creates_only_hourly_sensors():
+    coordinator = Mock()
+    coordinator.data = ({"water": [], "heating": []}, None)
+    entry = SimpleNamespace(
+        entry_id="entry-id",
+        data={"name": "Novafos", "use_grouped_sensors": True},
+        options={"use_grouped_sensors": True},
+    )
+    hass = SimpleNamespace(
+        data={DOMAIN: {entry.entry_id: {"coordinator": coordinator}}}
+    )
+    add_entities = Mock()
+    await async_setup_sensors(hass, entry, add_entities)
+    entities = add_entities.call_args.args[0]
+    assert len(entities) == 2
+    assert {entity.unique_id for entity in entities} == {
+        "novafos-water-statistics",
+        "novafos-heating-statistics",
+    }
+    assert all(entity.entity_description.key == "statistics" for entity in entities)
 
 
 @pytest.mark.asyncio
@@ -48,7 +70,6 @@ async def test_four_instances_have_independent_statistics_and_sensors(monkeypatc
     internal = Mock()
     external = Mock()
     monkeypatch.setattr(coordinator_module, "async_import_statistics", internal)
-    monkeypatch.setattr(legacy_statistics, "async_import_statistics", internal)
     monkeypatch.setattr(coordinator_module, "async_add_external_statistics", external)
     entity_ids = set()
     unique_ids = set()
@@ -70,9 +91,6 @@ async def test_four_instances_have_independent_statistics_and_sensors(monkeypatc
             api.get_statistics.return_value = {
                 meter_type: [{"DateFrom": "2026-10-01T00:00:00", "Value": 1.0}]
             }
-            api.get_grouped_statistics.return_value = [
-                ("2026-10-01T00:00:00", 1.0, 1.0, 1.0, 1.0, 1.0)
-            ]
             hass = SimpleNamespace(
                 config=SimpleNamespace(time_zone="Europe/Copenhagen"),
                 async_add_executor_job=execute,
@@ -80,9 +98,6 @@ async def test_four_instances_have_independent_statistics_and_sensors(monkeypatc
             coordinator = SimpleNamespace(hass=hass, api=api, entry=entry)
             fetched = await NovafosUpdateCoordinator._insert_statistics(
                 coordinator, False
-            )
-            await legacy_statistics.async_import_grouped_statistics(
-                hass, api, grouping=("day",), entry_data=entry.data
             )
             await NovafosUpdateCoordinator._insert_external_hourly_statistics(
                 coordinator, fetched
@@ -99,8 +114,7 @@ async def test_four_instances_have_independent_statistics_and_sensors(monkeypatc
             assert entity.entity_id == expected
             entity_ids.add(entity.entity_id)
             unique_ids.add(entity.unique_id)
-            assert internal.call_args_list[-2].args[1]["statistic_id"] == expected
-            assert internal.call_args.args[1]["statistic_id"] == f"{expected}_day"
+            assert internal.call_args.args[1]["statistic_id"] == expected
             assert external.call_args.args[1]["statistic_id"] == (
                 f"novafos:{customer_id}_{point_id}_{meter_type}_hourly_consumption"
             )
@@ -141,32 +155,29 @@ async def test_token_service_refreshes_all_or_selected_entry(target):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("authenticated", [True, False])
 @pytest.mark.parametrize(
-    ("data", "options", "legacy", "external"),
+    ("data", "options", "external"),
     [
-        ({"use_grouped_sensors": True}, {}, True, True),
+        ({"use_grouped_sensors": True}, {}, True),
         (
             {"use_grouped_sensors": True},
             {"use_external_statistics": False},
-            True,
             False,
         ),
         (
             {"use_grouped_sensors": False},
             {"use_external_statistics": True},
-            False,
             True,
         ),
-        ({"use_grouped_sensors": True}, {"use_grouped_sensors": False}, False, True),
+        ({"use_grouped_sensors": True}, {"use_grouped_sensors": False}, True),
         (
             {"use_grouped_sensors": False, "use_external_statistics": False},
             {},
             False,
-            False,
         ),
     ],
 )
-async def test_statistics_options_are_independent(
-    data, options, legacy, external, authenticated, monkeypatch
+async def test_statistics_options_ignore_removed_grouped_setting(
+    data, options, external, authenticated, monkeypatch
 ):
     async def run_executor(function, *args):
         return function(*args)
@@ -177,10 +188,6 @@ async def test_statistics_options_are_independent(
     api.authenticate_using_access_token.return_value = authenticated
     api.get_year_data.return_value = {}
     api._meter_data = {}
-    import_grouped = AsyncMock()
-    monkeypatch.setattr(
-        coordinator_module, "async_import_grouped_statistics", import_grouped
-    )
     coordinator = SimpleNamespace(
         hass=SimpleNamespace(async_add_executor_job=run_executor),
         api=api,
@@ -194,7 +201,7 @@ async def test_statistics_options_are_independent(
     await NovafosUpdateCoordinator._async_update_data(coordinator)
 
     assert coordinator._insert_statistics.await_count == int(authenticated)
-    assert import_grouped.await_count == int(legacy and authenticated)
+    api.get_grouped_statistics.assert_not_called()
     assert coordinator._insert_external_hourly_statistics.await_count == int(external)
     recorder.async_block_till_done.assert_not_awaited()
     if external:
@@ -218,20 +225,18 @@ async def test_configure_preserves_token_when_changing_statistics_options():
 
     form = await flow.async_step_init()
     defaults = form["data_schema"]({})
-    assert defaults["use_grouped_sensors"] is True
+    assert "use_grouped_sensors" not in defaults
     assert defaults["use_external_statistics"] is True
 
-    result = await flow.async_step_init(
-        {**defaults, "use_grouped_sensors": False, "use_external_statistics": True}
-    )
+    result = await flow.async_step_init({**defaults, "use_external_statistics": True})
     assert result["data"]["access_token"] == "saved-token"
     assert result["data"]["access_token_date_updated"] == "2026-09-01T00:00:00"
+    assert "use_grouped_sensors" not in result["data"]
 
 
 @pytest.mark.asyncio
-async def test_legacy_option_reloads_entities_external_option_refreshes():
+async def test_removed_grouped_option_does_not_reload_entities():
     coordinator = SimpleNamespace(
-        use_grouped_sensors=True,
         async_request_refresh=AsyncMock(),
     )
     hass = SimpleNamespace(
@@ -249,7 +254,8 @@ async def test_legacy_option_reloads_entities_external_option_refreshes():
 
     entry.options["use_grouped_sensors"] = False
     await update_listener(hass, entry)
-    hass.config_entries.async_reload.assert_awaited_once_with("entry-id")
+    assert coordinator.async_request_refresh.await_count == 2
+    hass.config_entries.async_reload.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -263,16 +269,6 @@ async def test_import_statistics_with_existing_sum_only_history(monkeypatch):
         "water": [{"DateFrom": "2026-09-26T00:00:00", "Value": 0.5}],
         "heating": [{"DateFrom": "2026-09-26T00:00:00", "Value": 2.0}],
     }
-    api.get_grouped_statistics.side_effect = lambda meter_type, grouping: [
-        (
-            "2026-09-26T00:00:00",
-            10.0 if meter_type == "water" else 30.0,
-            0.5,
-            0.0,
-            0.5,
-            0.25,
-        )
-    ]
     hass = SimpleNamespace(
         async_add_executor_job=run_executor,
         config=SimpleNamespace(time_zone="Europe/Copenhagen"),
@@ -311,46 +307,29 @@ async def test_import_statistics_with_existing_sum_only_history(monkeypatch):
     monkeypatch.setattr(
         coordinator_module, "async_import_statistics", import_statistics
     )
-    monkeypatch.setattr(legacy_statistics, "async_import_statistics", import_statistics)
-
     await NovafosUpdateCoordinator._insert_statistics(coordinator, debug=False)
-    await legacy_statistics.async_import_grouped_statistics(
-        hass, api, grouping=("day",)
-    )
 
     imports = {
         call.args[1]["statistic_id"]: (call.args[1], call.args[2])
         for call in import_statistics.call_args_list
     }
-    for statistic_id in (
-        "sensor.novafos_water_statistics",
-        "sensor.novafos_water_statistics_day",
+    assert len(imports) == 2
+    for meter_type, unit_class, total in (
+        ("water", "volume", 12.5),
+        ("heating", "energy", 22.0),
     ):
+        statistic_id = f"sensor.novafos_{meter_type}_statistics"
         metadata, statistics = imports[statistic_id]
         assert metadata["mean_type"] is StatisticMeanType.NONE
-        assert metadata["unit_class"] == "volume"
+        assert metadata["unit_class"] == unit_class
         assert metadata["has_sum"] is True
         assert "mean" not in statistics[0]
         assert "max" not in statistics[0]
         assert "min" not in statistics[0]
-    assert imports["sensor.novafos_water_statistics"][1][0]["sum"] == 12.5
-
-    for statistic_id in (
-        "sensor.novafos_heating_statistics",
-        "sensor.novafos_heating_statistics_day",
-    ):
-        metadata, statistics = imports[statistic_id]
-        assert metadata["mean_type"] is StatisticMeanType.NONE
-        assert metadata["unit_class"] == "energy"
-        assert metadata["has_sum"] is True
-        assert "mean" not in statistics[0]
-        assert "max" not in statistics[0]
-        assert "min" not in statistics[0]
-    assert imports["sensor.novafos_heating_statistics"][1][0]["sum"] == 22.0
-    assert imports["sensor.novafos_heating_statistics_day"][1][0]["sum"] == 30.0
+        assert statistics[0]["sum"] == total
     assert all(
         description.state_class is SensorStateClass.TOTAL
-        for description in HEATING_SENSOR_TYPES + EXTRA_HEATING_SENSOR_TYPES
+        for description in HEATING_SENSOR_TYPES
     )
 
 

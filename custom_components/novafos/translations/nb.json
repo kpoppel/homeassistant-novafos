@@ -16,7 +16,6 @@
             "user": {
                 "data": {
                     "name": "Sensornavn Præfix",
-                    "use_grouped_sensors": "Brug ekstra statistiksenorer til dag, uge, måned og år (udfases)",
                     "use_external_statistics": "Opret eksterne timestatistikker til forbrugstendenser"
                 }
             },
@@ -35,7 +34,6 @@
             "manual_token_flow": {
                 "data": {
                     "access_token": "Indsæt adgangstoken til opsætning eller opdatering af sensorer",
-                    "use_grouped_sensors": "Brug ekstra statistiksenorer til dag, uge, måned og år (udfases)",
                     "use_external_statistics": "Opret eksterne timestatistikker til forbrugstendenser"
                 }
             }
@@ -46,7 +44,6 @@
             "init": {
                 "data": {
                     "access_token": "Indsæt adgangstoken til opsætning eller opdatering af sensorer",
-                    "use_grouped_sensors": "Brug ekstra statistiksenorer til dag, uge, måned og år (udfases)",
                     "use_external_statistics": "Opret eksterne timestatistikker til forbrugstendenser"
                 }
             }

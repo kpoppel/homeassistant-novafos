@@ -44,6 +44,15 @@ def flow(mocker):
 
 
 @pytest.mark.asyncio
+async def test_initial_setup_does_not_offer_grouped_sensors(flow):
+    instance, _api = flow
+    result = await instance.async_step_user()
+    defaults = result["data_schema"]({})
+    assert "use_grouped_sensors" not in defaults
+    assert defaults["use_external_statistics"] is True
+
+
+@pytest.mark.asyncio
 async def test_address_then_metering(flow):
     instance, api = flow
     result = await instance.async_step_manual_token_flow({"access_token": "token"})

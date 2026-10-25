@@ -42,12 +42,6 @@ async def update_listener(hass: HomeAssistant, entry: ConfigEntry):
     )
     # Ensure the coordinator picks up the updated token/options
     coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
-    use_grouped_sensors = entry.options.get(
-        "use_grouped_sensors", entry.data.get("use_grouped_sensors", False)
-    )
-    if coordinator.use_grouped_sensors != use_grouped_sensors:
-        await hass.config_entries.async_reload(entry.entry_id)
-        return
     # Update coordinator local copies from the stored entry options
     coordinator.access_token = entry.options.get("access_token", "")
     coordinator.access_token_date_updated = entry.options.get(

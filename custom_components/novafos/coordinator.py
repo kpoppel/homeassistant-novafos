@@ -34,7 +34,6 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, meter_statistics_key
-from .legacy_statistics import async_import_grouped_statistics
 from .pynovafos.novafos import Novafos
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,9 +52,6 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
         self.api = api
         self.hass = hass
         self.entry = entry
-        self.use_grouped_sensors = entry.options.get(
-            "use_grouped_sensors", entry.data.get("use_grouped_sensors", False)
-        )
         # Attribute data for the sensors
         self.attrib_data = {"year_total": None}
         # Need local version here to enable updating via action service calls
@@ -94,13 +90,6 @@ class NovafosUpdateCoordinator(DataUpdateCoordinator):
                 )
                 # last_state = await self._insert_statistics(debug=debug)
                 hourly_statistics = await self._insert_statistics(debug=debug)
-                if self.entry.options.get(
-                    "use_grouped_sensors",
-                    self.entry.data.get("use_grouped_sensors", False),
-                ):
-                    await async_import_grouped_statistics(
-                        self.hass, self.api, entry_data=self.entry.data
-                    )
                 data = (self.api._meter_data, meter_year_data)  # , last_state)
             except Exception as ex:
                 raise UpdateFailed(f"The service is unavailable: {ex}")

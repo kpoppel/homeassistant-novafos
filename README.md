@@ -28,7 +28,7 @@ Fully configurable through config flow.
   1. Head to configuration --> integration
   2. Add new and search for Novafos
   3. Enter your name for the sensors, default is "Novafos". Different instances can use the same name.
-  4. External hourly consumption statistics are enabled by default. The separate grouped statistics sensor option is deprecated; enable it only if you still use those entities.
+  4. Leave external hourly consumption statistics enabled to use min/max/mean and consumption trends in Statistics Graph cards.
   5. Enter a valid access token to retrieve your addresses.
   6. Select an address. If the account has only one address, it is selected automatically.
   7. Select a water or heating meter at that address. A single available meter is selected automatically.
@@ -43,7 +43,7 @@ Use the sensor and statistic IDs assigned to your meter when configuring dashboa
 To update an access token for one instance, open its **Configure** dialog. To update all loaded instances, call
 `novafos.update_token`. If your instances use separate logins, supply `config_entry_id` to target the intended instance.
 
-Both options can be changed later via Configure. Older installations keep their grouped sensor setting; external statistics are enabled by default independently of that setting. Disabling grouped sensors stops importing their grouped history, but does not delete existing recorder history. The main hourly `sensor.*` history remains available regardless of either option.
+Use **Configure** to enable or disable external statistics. The main hourly `sensor.*` history is always recorded.
 
 ---
 # Notice on integration status and ways to login
@@ -124,9 +124,6 @@ The integration creates the following sensors for water/heating (here water used
 * sensor.novafos_water_statistics
   * Statistics sensor with hourly resolution. Stores a cumulative `sum`. Use `change` to see consumption per hour, day, week or month.
   * This is the sensor you want to use for the energy dashboard.
-* sensor.novafos_water_statistics_{day|week|month|year} (optional, deprecated)
-  * Historical totals for each completed day, week, month or year. These are computed period totals.
-  * **Migrate away from these and use the external statistic instead.**
 * `novafos:water_hourly_consumption` (optional external statistic; `novafos:heating_hourly_consumption` for heating)
   * Hourly based statistics. Use `change` in the built-in Statistics graph to show consumption trends day-to-day, week-to-week, month-to-month or year-to-year.
   * This statistic has min/max/mean/change data calculated.
@@ -139,6 +136,11 @@ Water statistics use cubic meters (m3), heating statistics kilowatt-hours (kWh).
 like `TOTAL` type sensors (statistics-only) to have `min`, `max` or `mean`. The `novafix:..._hourly_consumption` statistic stores
 arithmetic min/mean/max and change without changing the Energy dashboard's sensor history.
 The main sensor also exposes a `year_total` attribute when yearly data is available.
+
+Replace dashboard references to `sensor.novafos_water_statistics_{day|week|month|year}` with the main hourly sensor
+or external statistic for your meter. Select `change` and the desired day, week, month or year period to show consumption.
+Remove unused grouped sensor entities through **Settings > Devices & services > Entities**. Their recorded history
+is not deleted automatically.
 
 Under consideration is adding attributes for some sort of high/low warning so that an indication for high water use or never having zero flow could be flagged.  You can add a helper which flags if the `min` is ever rising above 0.0.
 
@@ -212,8 +214,6 @@ For the hourly data you can furthermore get graphs showing the sum, state and ch
   - Chart type: Line
 
 ![alt text](images/statistics-graph-sum-state-change.png)
-
-(Note: If you try out using the optional computed grouped sensors you need to use the `state` statistic)
 
 ## Max, min, mean graphs using Apexchart
 
