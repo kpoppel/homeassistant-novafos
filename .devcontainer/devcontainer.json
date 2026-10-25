@@ -1,6 +1,9 @@
 {
     "name": "kpoppel/homeassistant-novafos",
     "image": "mcr.microsoft.com/devcontainers/base:debian",
+    "containerEnv": {
+        "TZ": "Europe/Copenhagen"
+    },
     "postCreateCommand": "scripts/setup",
     "forwardPorts": [
         8123
